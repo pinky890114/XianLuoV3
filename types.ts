@@ -29,7 +29,6 @@ export enum OrderStatus {
     DELIVERED = '已送達',
 }
 
-// 明確定義陣列順序以確保進度條顯示正確
 export const OrderStatusArray = [
     OrderStatus.PENDING,
     OrderStatus.ACCEPTED,
@@ -52,7 +51,6 @@ export interface Message {
     timestamp: Timestamp;
 }
 
-// 保留舊的 AdminNote 以相容舊資料，但主要邏輯將遷移至 messages
 export interface AdminNote {
     text: string;
     timestamp: Timestamp;
@@ -69,20 +67,39 @@ export interface DollOrder {
     addons: Addon[];
     totalPrice: number;
     status: OrderStatus;
-    adminNotes: AdminNote[]; // Deprecated, kept for backward compatibility
-    messages: Message[]; // New field for 2-way communication
+    adminNotes: AdminNote[];
+    messages: Message[];
     progressImageUrls: string[];
     createdAt: Timestamp;
+}
+
+// --- 暹羅地攤相關型別 ---
+
+export interface ProductSpec {
+    specName: string;
+    price: number;
+    imageUrl: string;
+    isActive: boolean;
+}
+
+export interface Product {
+    id: string;
+    categoryId: string; // 如：'快閃櫥窗', '金屬徽章', '棉花製品'
+    seriesName: string; // 如：'【goodslove】劍影俠光'
+    specs: ProductSpec[];
+    basicDescription?: string; // 基本說明
+    priceDescription?: string; // 價格說明
 }
 
 export interface BadgeOrder {
     id: string;
     orderId: string;
     nickname: string;
-    mainCategory: string;
-    subCategory: string;
+    productTitle: string; // 完整名稱：[分類] 系列 - 規格
+    price: number;
     status: OrderStatus;
-    adminNotes: AdminNote[];
+    messages: Message[];
     progressImageUrls: string[];
     createdAt: Timestamp;
+    remarks: string;
 }

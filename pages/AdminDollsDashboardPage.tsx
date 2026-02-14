@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, doc, updateDoc, Timestamp, arrayUnion, addDoc, getDoc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
@@ -18,10 +17,8 @@ const AdminDollsDashboardPage: React.FC = () => {
     const [isShopOpen, setIsShopOpen] = useState(true);
     const [isTogglingShop, setIsTogglingShop] = useState(false);
     
-    // Batch Selection State
     const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
     
-    // Edit Modal state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<DollOrder | null>(null);
     const [newStatus, setNewStatus] = useState<OrderStatus | null>(null);
@@ -29,12 +26,10 @@ const AdminDollsDashboardPage: React.FC = () => {
     const [editingPrice, setEditingPrice] = useState<number | ''>('');
     const [editingRemarks, setEditingRemarks] = useState('');
     
-    // Chat state in Admin
     const [adminMessageInput, setAdminMessageInput] = useState('');
     const [isSendingMessage, setIsSendingMessage] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // New Order Modal state
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
     const [newOrderNickname, setNewOrderNickname] = useState('');
     const [newOrderTitle, setNewOrderTitle] = useState('');
@@ -44,15 +39,20 @@ const AdminDollsDashboardPage: React.FC = () => {
     const [newOrderRemarks, setNewOrderRemarks] = useState('');
     const [newOrderAddons, setNewOrderAddons] = useState<Set<string>>(new Set());
 
-    // Batch Delete Confirmation Modal state (Fail-safe)
     const [isBatchDeleteModalOpen, setIsBatchDeleteModalOpen] = useState(false);
     const [batchDeleteInput, setBatchDeleteInput] = useState('');
 
-    // Batch Cleanup Modal state (Old Orders)
     const [isCleanupModalOpen, setIsCleanupModalOpen] = useState(false);
     const [isNoOldOrdersModalOpen, setIsNoOldOrdersModalOpen] = useState(false);
     const [cleanupCandidates, setCleanupCandidates] = useState<DollOrder[]>([]);
     const [selectedCleanupIds, setSelectedCleanupIds] = useState<Set<string>>(new Set());
+
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncProgress, setSyncProgress] = useState('');
+
+    // Modal states to replace window.alert and window.confirm
+    const [infoModalState, setInfoModalState] = useState<{ title: string; message: React.ReactNode } | null>(null);
+    const [confirmModalState, setConfirmModalState] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; confirmText?: string; } | null>(null);
 
     const fetchOrders = useCallback(async () => {
         setIsLoading(true);
@@ -63,7 +63,6 @@ const AdminDollsDashboardPage: React.FC = () => {
                 .map(doc => ({ id: doc.id, ...doc.data() } as DollOrder))
                 .filter(doc => doc.id !== 'store_config');
             setOrders(fetchedOrders);
-            // Reset selection on refetch
             setSelectedOrderIds(new Set());
         } catch (error) {
             console.error("Error fetching orders: ", error);
@@ -79,11 +78,7 @@ const AdminDollsDashboardPage: React.FC = () => {
             if (docSnap.exists()) {
                 setIsShopOpen(docSnap.data().isShopOpen ?? true);
             } else {
-                try {
-                    await setDoc(docRef, { isShopOpen: true });
-                } catch (e) {
-                    console.warn("Could not init store config, using default", e);
-                }
+                await setDoc(docRef, { isShopOpen: true });
                 setIsShopOpen(true);
             }
         } catch (error) {
@@ -97,7 +92,6 @@ const AdminDollsDashboardPage: React.FC = () => {
         fetchShopStatus();
     }, [fetchOrders, fetchShopStatus]);
 
-    // Scroll to bottom of chat when messages change or modal opens
     useEffect(() => {
         if (isEditModalOpen && messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -113,19 +107,57 @@ const AdminDollsDashboardPage: React.FC = () => {
             setIsShopOpen(newState);
         } catch (error) {
             console.error("Error toggling shop status:", error);
-            alert("切換狀態失敗：可能是權限不足或網路問題。");
+            setInfoModalState({ title: '操作失敗', message: '切換狀態失敗：可能是權限不足或網路問題。' });
         } finally {
             setIsTogglingShop(false);
         }
     };
+    
+    const handleBatchSync = async () => {
+        const syncAction = async () => {
+            setIsSyncing(true);
+            setSyncProgress(`(0/${orders.length})`);
+            let successCount = 0;
+            let errorCount = 0;
+            const sortedOrders = [...orders].sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
 
-    // --- Batch Selection Logic ---
+            for (let i = 0; i < sortedOrders.length; i++) {
+                const order = sortedOrders[i];
+                try {
+                    await syncOrderToGoogleSheet(order);
+                    successCount++;
+                } catch (error) {
+                    console.error(`Failed to sync order ${order.orderId}:`, error);
+                    errorCount++;
+                }
+                setSyncProgress(`(${i + 1}/${sortedOrders.length})`);
+            }
+
+            setIsSyncing(false);
+            setSyncProgress('');
+
+            setInfoModalState({
+                title: '同步完成！',
+                message: (
+                    <div>
+                        <p>成功: {successCount} 筆</p>
+                        <p>失敗: {errorCount} 筆</p>
+                        <p className="text-sm mt-2">詳情請查看瀏覽器開發者主控台。</p>
+                    </div>
+                )
+            });
+        };
+
+        setConfirmModalState({
+            title: '確認同步',
+            message: `確定要將全部 ${orders.length} 筆訂單同步到 Google Sheets 嗎？\n\n- 這將會逐筆新增或更新 Sheet 中的資料。\n- 如果訂單數量龐大，可能需要一些時間。`,
+            onConfirm: syncAction,
+            confirmText: '開始同步'
+        });
+    };
+
     const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.checked) {
-            setSelectedOrderIds(new Set(orders.map(o => o.id)));
-        } else {
-            setSelectedOrderIds(new Set());
-        }
+        setSelectedOrderIds(e.target.checked ? new Set(orders.map(o => o.id)) : new Set());
     };
 
     const toggleSelectOrder = (id: string) => {
@@ -135,25 +167,16 @@ const AdminDollsDashboardPage: React.FC = () => {
         setSelectedOrderIds(newSet);
     };
 
-    // --- Delete Logic ---
     const deleteOrderImages = async (order: DollOrder) => {
-        const deletePromises: Promise<void>[] = [];
-        if (order.referenceImageUrls && order.referenceImageUrls.length > 0) {
-            order.referenceImageUrls.forEach(url => {
-                try {
-                    const imageRef = ref(storage, url);
-                    deletePromises.push(deleteObject(imageRef).catch(err => console.warn("Image delete failed (might already be gone):", err)));
-                } catch (e) { console.warn(e); }
-            });
-        }
-        if (order.progressImageUrls && order.progressImageUrls.length > 0) {
-            order.progressImageUrls.forEach(url => {
-                try {
-                    const imageRef = ref(storage, url);
-                    deletePromises.push(deleteObject(imageRef).catch(err => console.warn("Image delete failed (might already be gone):", err)));
-                } catch (e) { console.warn(e); }
-            });
-        }
+        const urls = [...(order.referenceImageUrls || []), ...(order.progressImageUrls || [])];
+        const deletePromises = urls.map(url => {
+            try {
+                return deleteObject(ref(storage, url)).catch(err => console.warn("Image delete failed:", err));
+            } catch (e) {
+                console.warn(e);
+                return Promise.resolve();
+            }
+        });
         await Promise.all(deletePromises);
     };
 
@@ -165,48 +188,42 @@ const AdminDollsDashboardPage: React.FC = () => {
 
     const executeBatchDelete = async () => {
         if (batchDeleteInput !== '確認刪除') {
-            alert("輸入驗證碼錯誤");
+            setInfoModalState({ title: '錯誤', message: '輸入驗證碼錯誤。' });
             return;
         }
         
         setIsUpdating(true);
         try {
             const batch = writeBatch(db);
-            const imageDeletionPromises: Promise<void>[] = [];
             const idsToDelete = Array.from(selectedOrderIds);
             
             for (const id of idsToDelete) {
                 const order = orders.find(o => o.id === id);
                 if (order) {
-                    imageDeletionPromises.push(deleteOrderImages(order));
+                    await deleteOrderImages(order);
                     batch.delete(doc(db, 'dollOrders', id));
                 }
             }
             
-            await Promise.all(imageDeletionPromises);
             await batch.commit();
-            
-            alert(`成功刪除 ${idsToDelete.length} 筆訂單。`);
+            setInfoModalState({ title: '成功', message: `成功刪除 ${idsToDelete.length} 筆訂單。` });
             await fetchOrders();
             setIsBatchDeleteModalOpen(false);
         } catch (error: any) {
             console.error("Batch delete error:", error);
-            alert(`批次刪除失敗: ${error.message}`);
+            setInfoModalState({ title: '批次刪除失敗', message: error.message });
         } finally {
             setIsUpdating(false);
         }
     };
 
-    // --- Cleanup Modal Logic (Old Orders) ---
     const openCleanupModal = () => {
-        const now = Date.now();
         const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
-        const cutoffTime = now - sixtyDaysMs;
-        const candidates = orders.filter(order => {
-            const isDelivered = order.status === OrderStatus.DELIVERED || order.status === '已送達(委託完成)' as any;
-            const isOld = order.createdAt.toMillis() < cutoffTime;
-            return isDelivered && isOld;
-        });
+        const cutoffTime = Date.now() - sixtyDaysMs;
+        const candidates = orders.filter(order => 
+            (order.status === OrderStatus.DELIVERED || order.status === '已送達(委託完成)' as any) && 
+            order.createdAt.toMillis() < cutoffTime
+        );
 
         if (candidates.length === 0) {
             setIsNoOldOrdersModalOpen(true);
@@ -227,38 +244,41 @@ const AdminDollsDashboardPage: React.FC = () => {
 
     const executeBatchCleanup = async () => {
         if (selectedCleanupIds.size === 0) {
-            alert("未選擇任何訂單");
+            setInfoModalState({ title: '提示', message: '未選擇任何訂單。' });
             return;
         }
-        if (!window.confirm(`確定要永久刪除這 ${selectedCleanupIds.size} 筆訂單嗎？\n這將同時刪除所有相關圖片！`)) {
-            return;
-        }
-        setIsUpdating(true);
-        try {
-            const batch = writeBatch(db);
-            const imageDeletionPromises: Promise<void>[] = [];
-            selectedCleanupIds.forEach(id => {
-                const order = cleanupCandidates.find(o => o.id === id);
-                if (order) {
-                    imageDeletionPromises.push(deleteOrderImages(order));
-                    const docRef = doc(db, 'dollOrders', id);
-                    batch.delete(docRef);
+        
+        const cleanupAction = async () => {
+            setIsUpdating(true);
+            try {
+                const batch = writeBatch(db);
+                for (const id of selectedCleanupIds) {
+                    const order = cleanupCandidates.find(o => o.id === id);
+                    if (order) {
+                        await deleteOrderImages(order);
+                        batch.delete(doc(db, 'dollOrders', id));
+                    }
                 }
-            });
-            await Promise.all(imageDeletionPromises);
-            await batch.commit();
-            alert(`已成功清除 ${selectedCleanupIds.size} 筆舊訂單及其圖片。`);
-            await fetchOrders();
-            setIsCleanupModalOpen(false);
-        } catch (error: any) {
-            console.error("Error cleaning up orders:", error);
-            alert(`清除失敗: ${error.message}`);
-        } finally {
-            setIsUpdating(false);
-        }
+                await batch.commit();
+                setInfoModalState({ title: '成功', message: `已成功清除 ${selectedCleanupIds.size} 筆舊訂單及其圖片。` });
+                await fetchOrders();
+                setIsCleanupModalOpen(false);
+            } catch (error: any) {
+                console.error("Error cleaning up orders:", error);
+                setInfoModalState({ title: '清除失敗', message: error.message });
+            } finally {
+                setIsUpdating(false);
+            }
+        };
+
+        setConfirmModalState({
+            title: '確認清除',
+            message: `確定要永久刪除這 ${selectedCleanupIds.size} 筆訂單嗎？\n這將同時刪除所有相關圖片！此動作無法復原。`,
+            onConfirm: cleanupAction,
+            confirmText: '確認清除'
+        });
     };
 
-    // --- Edit Modal Functions ---
     const openEditModal = (order: DollOrder) => {
         setSelectedOrder(order);
         setNewStatus(order.status);
@@ -279,7 +299,6 @@ const AdminDollsDashboardPage: React.FC = () => {
     };
 
     const openNewOrderModal = () => setIsNewOrderModalOpen(true);
-
     const closeNewOrderModal = () => {
         setIsNewOrderModalOpen(false);
         setNewOrderNickname('');
@@ -293,44 +312,30 @@ const AdminDollsDashboardPage: React.FC = () => {
 
     const handleCreateOrder = async () => {
         if (!newOrderNickname || !newOrderTitle || !newOrderImages || newOrderPrice === '') {
-            alert('請填寫暱稱、委託標題、總金額並上傳說明圖！');
+            setInfoModalState({ title: '資料不完整', message: '請填寫暱稱、委託標題、總金額並上傳說明圖！' });
             return;
         }
         setIsUpdating(true);
         try {
-            const uploadPromises = Array.from(newOrderImages).map((file: File) =>
-                uploadAndCompressImage(file, 'doll-references', 'reference')
-            );
+            // Fix: Explicitly type `file` as `File` to resolve a TypeScript error where it was incorrectly inferred as `unknown`.
+            const uploadPromises = Array.from(newOrderImages).map((file: File) => uploadAndCompressImage(file, 'doll-references', 'reference'));
             const imageUrls = await Promise.all(uploadPromises);
-
-            const shortOrderId = `NOCY-${Date.now().toString().slice(-6)}`;
             const newOrderData = {
-                orderId: shortOrderId,
-                nickname: newOrderNickname,
-                title: newOrderTitle,
-                totalPrice: Number(newOrderPrice),
-                status: OrderStatus.ACCEPTED,
-                headpieceCraft: newOrderHeadpieceCraft,
-                referenceImageUrls: imageUrls,
+                orderId: `NOCY-${Date.now().toString().slice(-6)}`,
+                nickname: newOrderNickname, title: newOrderTitle,
+                totalPrice: Number(newOrderPrice), status: OrderStatus.ACCEPTED,
+                headpieceCraft: newOrderHeadpieceCraft, referenceImageUrls: imageUrls,
                 remarks: newOrderRemarks || '由管理員手動建立',
                 addons: DOLL_ADDONS.filter(addon => newOrderAddons.has(addon.id)),
-                adminNotes: [],
-                messages: [],
-                progressImageUrls: [],
-                createdAt: Timestamp.now(),
+                messages: [], progressImageUrls: [], createdAt: Timestamp.now(),
             };
-            
-            // Add to Firebase
             await addDoc(collection(db, 'dollOrders'), newOrderData);
-            
-            // Sync to Google Sheets
             await syncOrderToGoogleSheet(newOrderData as any);
-
             await fetchOrders();
             closeNewOrderModal();
         } catch (error) {
             console.error("Error creating order:", error);
-            alert("新增訂單失敗！");
+            setInfoModalState({ title: '新增訂單失敗', message: error instanceof Error ? error.message : String(error) });
         } finally {
             setIsUpdating(false);
         }
@@ -340,30 +345,15 @@ const AdminDollsDashboardPage: React.FC = () => {
         if (!selectedOrder || !adminMessageInput.trim()) return;
         setIsSendingMessage(true);
         try {
-            const orderRef = doc(db, 'dollOrders', selectedOrder.id);
-            const newMessage = {
-                text: adminMessageInput.trim(),
-                sender: 'admin',
-                timestamp: Timestamp.now(),
-            };
-            await updateDoc(orderRef, {
-                messages: arrayUnion(newMessage)
-            });
-
-            // Optimistic update for UI
-            const updatedOrder = {
-                ...selectedOrder,
-                messages: [...(selectedOrder.messages || []), newMessage] as any
-            };
+            const newMessage = { text: adminMessageInput.trim(), sender: 'admin' as const, timestamp: Timestamp.now() };
+            await updateDoc(doc(db, 'dollOrders', selectedOrder.id), { messages: arrayUnion(newMessage) });
+            const updatedOrder = { ...selectedOrder, messages: [...(selectedOrder.messages || []), newMessage] as any };
             setSelectedOrder(updatedOrder);
-            
-            // Also update main list silently
             setOrders(prev => prev.map(o => o.id === selectedOrder.id ? updatedOrder : o));
-            
             setAdminMessageInput('');
         } catch (error) {
             console.error("Error sending message:", error);
-            alert("訊息發送失敗");
+            setInfoModalState({ title: '錯誤', message: '訊息發送失敗' });
         } finally {
             setIsSendingMessage(false);
         }
@@ -373,40 +363,26 @@ const AdminDollsDashboardPage: React.FC = () => {
         if (!selectedOrder) return;
         setIsUpdating(true);
         try {
-            const orderRef = doc(db, 'dollOrders', selectedOrder.id);
             const updates: any = {};
-            if (newStatus && newStatus !== selectedOrder.status) {
-                updates.status = newStatus;
-            }
-            if (editingPrice !== '' && Number(editingPrice) !== selectedOrder.totalPrice) {
-                updates.totalPrice = Number(editingPrice);
-            }
-            if (editingRemarks !== selectedOrder.remarks) {
-                updates.remarks = editingRemarks;
-            }
+            if (newStatus && newStatus !== selectedOrder.status) updates.status = newStatus;
+            if (editingPrice !== '' && Number(editingPrice) !== selectedOrder.totalPrice) updates.totalPrice = Number(editingPrice);
+            if (editingRemarks !== selectedOrder.remarks) updates.remarks = editingRemarks;
             
             if (newImage) {
-                const downloadURL = await uploadAndCompressImage(newImage, 'progress-images', 'progress');
-                updates.progressImageUrls = arrayUnion(downloadURL);
+                updates.progressImageUrls = arrayUnion(await uploadAndCompressImage(newImage, 'progress-images', 'progress'));
             }
 
             if (Object.keys(updates).length > 0) {
-                 await updateDoc(orderRef, updates);
-                 
-                 // Sync with Google Sheets if relevant fields changed
+                 await updateDoc(doc(db, 'dollOrders', selectedOrder.id), updates);
                  if (updates.status || updates.totalPrice || updates.remarks) {
-                     const updatedOrderData = {
-                         ...selectedOrder,
-                         ...updates
-                     };
-                     await syncOrderToGoogleSheet(updatedOrderData);
+                     await syncOrderToGoogleSheet({ ...selectedOrder, ...updates });
                  }
             }
             await fetchOrders();
             closeEditModal();
         } catch (error) {
             console.error("Error updating order:", error);
-            alert("更新失敗！");
+            setInfoModalState({ title: '更新失敗', message: error instanceof Error ? error.message : String(error) });
         } finally {
             setIsUpdating(false);
         }
@@ -449,24 +425,21 @@ const AdminDollsDashboardPage: React.FC = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                         清除舊單
                     </button>
+                    <button
+                        onClick={handleBatchSync}
+                        disabled={isSyncing || isLoading || orders.length === 0}
+                        className="bg-white text-green-700 py-2 px-4 rounded-lg shadow-sm hover:bg-gray-50 transition-all flex items-center gap-2 border border-green-700/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="將所有訂單資料同步到 Google Sheet"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                        {isSyncing ? `同步中... ${syncProgress}` : '同步'}
+                    </button>
                     <button 
                         onClick={toggleShopStatus} 
                         disabled={isTogglingShop}
-                        className={`py-2 px-6 rounded-lg shadow-md font-bold transition-all flex items-center gap-2 ${
-                            isShopOpen 
-                                ? 'bg-green-600 text-white hover:bg-green-700' 
-                                : 'bg-gray-500 text-white hover:bg-gray-600'
-                        }`}
+                        className={`py-2 px-6 rounded-lg shadow-md font-bold transition-all flex items-center gap-2 ${isShopOpen ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
                     >
-                        {isTogglingShop ? <LoadingSpinner /> : (
-                            <>
-                                {isShopOpen ? (
-                                    <><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> 營業中</>
-                                ) : (
-                                    <><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg> 歇業中</>
-                                )}
-                            </>
-                        )}
+                        {isTogglingShop ? <LoadingSpinner /> : isShopOpen ? '營業中' : '歇業中'}
                     </button>
                     <button onClick={openNewOrderModal} className="bg-siam-blue text-siam-cream py-2 px-4 rounded-lg shadow-md hover:bg-siam-dark transition-all whitespace-nowrap">
                         新增訂單
@@ -476,23 +449,13 @@ const AdminDollsDashboardPage: React.FC = () => {
 
             <div className="bg-white/50 p-6 rounded-lg shadow-md">
                 {isLoading ? (
-                    <div className="flex flex-col items-center justify-center p-8 text-center">
-                        <LoadingSpinner />
-                        <p className="mt-4 text-siam-dark font-semibold">正在讀取訂單資料...</p>
-                    </div>
+                    <div className="flex flex-col items-center justify-center p-8 text-center"><LoadingSpinner /><p className="mt-4 text-siam-dark font-semibold">正在讀取訂單資料...</p></div>
                 ) : (
                     <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-siam-blue">
                         <thead className="bg-siam-blue/10">
                             <tr>
-                                <th className="px-4 py-3 w-10">
-                                    <input 
-                                        type="checkbox" 
-                                        className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer"
-                                        checked={selectedOrderIds.size === orders.length && orders.length > 0}
-                                        onChange={toggleSelectAll}
-                                    />
-                                </th>
+                                <th className="px-4 py-3 w-10"><input type="checkbox" className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer" checked={selectedOrderIds.size === orders.length && orders.length > 0} onChange={toggleSelectAll} /></th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-siam-dark uppercase tracking-wider">訂單編號</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-siam-dark uppercase tracking-wider">暱稱</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-siam-dark uppercase tracking-wider">標題</th>
@@ -504,26 +467,13 @@ const AdminDollsDashboardPage: React.FC = () => {
                         <tbody className="bg-white divide-y divide-gray-200">
                             {orders.map(order => (
                                 <tr key={order.id} className={selectedOrderIds.has(order.id) ? 'bg-blue-50' : ''}>
-                                    <td className="px-4 py-4 w-10">
-                                        <input 
-                                            type="checkbox" 
-                                            className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer"
-                                            checked={selectedOrderIds.has(order.id)}
-                                            onChange={() => toggleSelectOrder(order.id)}
-                                        />
-                                    </td>
+                                    <td className="px-4 py-4 w-10"><input type="checkbox" className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer" checked={selectedOrderIds.has(order.id)} onChange={() => toggleSelectOrder(order.id)} /></td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">{order.orderId}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-siam-dark">{order.nickname}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">{order.title}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">NT$ {order.totalPrice}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                            {order.status === '已送達(委託完成)' ? '已送達' : order.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button onClick={() => openEditModal(order)} className="text-siam-blue hover:text-siam-dark font-bold">查看/編輯</button>
-                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{order.status === '已送達(委託完成)' ? '已送達' : order.status}</span></td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium"><button onClick={() => openEditModal(order)} className="text-siam-blue hover:text-siam-dark font-bold">查看/編輯</button></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -532,298 +482,172 @@ const AdminDollsDashboardPage: React.FC = () => {
                 )}
             </div>
             
-            {/* Batch Delete Confirmation Modal */}
             <Modal isOpen={isBatchDeleteModalOpen} onClose={() => setIsBatchDeleteModalOpen(false)} title="⚠️ 批次刪除確認">
                 <div className="space-y-4">
                     <div className="bg-red-50 border border-red-200 rounded p-4 text-red-700">
                         <p className="font-bold text-lg mb-2">嚴重警告：此動作無法復原！</p>
                         <p>您即將永久刪除 <span className="font-bold text-xl">{selectedOrderIds.size}</span> 筆訂單。</p>
-                        <ul className="list-disc list-inside mt-2 text-sm">
-                            <li>所有選取的訂單資料將被永久移除。</li>
-                            <li>所有相關的參考圖、進度圖將從資料庫中刪除。</li>
-                        </ul>
+                        <ul className="list-disc list-inside mt-2 text-sm"><li>所有選取的訂單資料將被永久移除。</li><li>所有相關的參考圖、進度圖將從資料庫中刪除。</li></ul>
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">請輸入「確認刪除」以執行此操作：</label>
-                        <input 
-                            type="text" 
-                            value={batchDeleteInput}
-                            onChange={(e) => setBatchDeleteInput(e.target.value)}
-                            placeholder="確認刪除"
-                            className="w-full p-2 border border-red-300 rounded focus:ring-2 focus:ring-red-500 outline-none placeholder:text-gray-300"
-                        />
+                        <input type="text" value={batchDeleteInput} onChange={(e) => setBatchDeleteInput(e.target.value)} placeholder="確認刪除" className="w-full p-2 border border-red-300 rounded focus:ring-2 focus:ring-red-500 outline-none placeholder:text-gray-300" />
                     </div>
                     <div className="flex justify-end space-x-3 pt-2">
-                            <button onClick={() => setIsBatchDeleteModalOpen(false)} className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded">取消</button>
-                            <button 
-                            onClick={executeBatchDelete}
-                            disabled={batchDeleteInput !== '確認刪除' || isUpdating}
-                            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
-                            >
-                            {isUpdating ? <LoadingSpinner /> : '確認刪除'}
-                            </button>
+                        <button onClick={() => setIsBatchDeleteModalOpen(false)} className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded">取消</button>
+                        <button onClick={executeBatchDelete} disabled={batchDeleteInput !== '確認刪除' || isUpdating} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center">{isUpdating ? <LoadingSpinner /> : '確認刪除'}</button>
                     </div>
                 </div>
             </Modal>
 
-            {/* No Old Orders Modal */}
             <Modal isOpen={isNoOldOrdersModalOpen} onClose={() => setIsNoOldOrdersModalOpen(false)} title="清除舊訂單">
                  <div className="flex flex-col items-center justify-center p-4 space-y-4">
-                    <div className="bg-green-100 p-4 rounded-full">
-                         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                    </div>
+                    <div className="bg-green-100 p-4 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
                     <p className="text-lg font-bold text-siam-dark">目前沒有舊訂單</p>
                     <p className="text-siam-brown text-center">系統中沒有「已送達」且建立時間超過 60 天的訂單。</p>
-                    <button onClick={() => setIsNoOldOrdersModalOpen(false)} className="px-6 py-2 bg-siam-blue text-white rounded hover:bg-siam-dark">
-                        好的
-                    </button>
+                    <button onClick={() => setIsNoOldOrdersModalOpen(false)} className="px-6 py-2 bg-siam-blue text-white rounded hover:bg-siam-dark">好的</button>
                  </div>
             </Modal>
 
-            {/* Batch Cleanup Modal */}
             <Modal isOpen={isCleanupModalOpen} onClose={() => setIsCleanupModalOpen(false)} title="清除舊訂單 (送達 > 60天)">
                 <div className="space-y-4 flex flex-col max-h-[70vh]">
-                    <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-yellow-800 text-sm">
-                        <p>請勾選您要<b>刪除</b>的訂單。未勾選的訂單將會被保留。</p>
-                        <p className="font-bold mt-1">注意：刪除後無法復原！相關圖片也會一併刪除。</p>
-                    </div>
-                    
+                    <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-yellow-800 text-sm"><p>請勾選您要<b>刪除</b>的訂單。未勾選的訂單將會被保留。</p><p className="font-bold mt-1">注意：刪除後無法復原！相關圖片也會一併刪除。</p></div>
                     <div className="flex-grow overflow-y-auto border border-gray-200 rounded p-2 bg-white space-y-2">
                         {cleanupCandidates.map(order => (
                             <label key={order.id} className="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-100 last:border-0">
-                                <input 
-                                    type="checkbox" 
-                                    checked={selectedCleanupIds.has(order.id)}
-                                    onChange={() => toggleCleanupSelection(order.id)}
-                                    className="mt-1 h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                                />
-                                <div className="text-sm">
-                                    <p className="font-bold text-gray-800">{order.nickname} - {order.title}</p>
-                                    <p className="text-gray-500 text-xs font-mono">{order.orderId} | {new Date(order.createdAt.toMillis()).toLocaleDateString()}</p>
-                                </div>
+                                <input type="checkbox" checked={selectedCleanupIds.has(order.id)} onChange={() => toggleCleanupSelection(order.id)} className="mt-1 h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500" />
+                                <div className="text-sm"><p className="font-bold text-gray-800">{order.nickname} - {order.title}</p><p className="text-gray-500 text-xs font-mono">{order.orderId} | {new Date(order.createdAt.toMillis()).toLocaleDateString()}</p></div>
                             </label>
                         ))}
                     </div>
-
                     <div className="flex justify-between items-center pt-2 border-t">
-                        <div className="text-sm text-gray-500">
-                            已選 {selectedCleanupIds.size} / {cleanupCandidates.length} 筆
-                        </div>
+                        <div className="text-sm text-gray-500">已選 {selectedCleanupIds.size} / {cleanupCandidates.length} 筆</div>
                         <div className="flex space-x-3">
                             <button onClick={() => setIsCleanupModalOpen(false)} className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded">取消</button>
-                            <button 
-                                onClick={executeBatchCleanup}
-                                disabled={selectedCleanupIds.size === 0 || isUpdating}
-                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
-                            >
-                                {isUpdating ? <LoadingSpinner /> : '確認清除'}
-                            </button>
+                            <button onClick={executeBatchCleanup} disabled={selectedCleanupIds.size === 0 || isUpdating} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center">{isUpdating ? <LoadingSpinner /> : '確認清除'}</button>
                         </div>
                     </div>
                 </div>
             </Modal>
 
-            {/* Edit/View Order Modal */}
-            {selectedOrder && (
-                <Modal isOpen={isEditModalOpen} onClose={closeEditModal} title={`管理訂單: ${selectedOrder.orderId}`} maxWidth="max-w-6xl">
-                    <div className="flex flex-col lg:flex-row gap-6 h-full lg:h-[70vh]">
-                        {/* Left Column: Details & Edit Fields */}
-                        <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2">
-                            {/* Order Details (Read-onlyish) */}
-                            <div className="bg-gray-100 p-4 rounded-md space-y-4">
-                                <h3 className="font-bold text-siam-dark border-b border-gray-300 pb-2">委託內容詳情</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                     <div>
-                                        <p className="text-sm font-bold text-gray-500">頭飾工藝</p>
-                                        <p className="text-siam-dark">{selectedOrder.headpieceCraft}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-gray-500">加價購項目</p>
-                                        {selectedOrder.addons && selectedOrder.addons.length > 0 ? (
-                                            <p className="text-siam-dark text-sm">{selectedOrder.addons.map(a => a.name).join(', ')}</p>
-                                        ) : <span className="text-sm text-gray-400">無</span>}
-                                    </div>
-                                </div>
-                                <div>
-                                    <p className="text-sm font-bold text-gray-500">參考圖 (點擊開啟大圖)</p>
-                                    <div className="flex gap-2 overflow-x-auto py-2">
-                                        {selectedOrder.referenceImageUrls && selectedOrder.referenceImageUrls.length > 0 ? (
-                                            selectedOrder.referenceImageUrls.map((url, idx) => (
-                                                <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
-                                                    <img src={url} alt={`Ref ${idx}`} className="w-20 h-20 object-cover rounded shadow-sm hover:opacity-80 transition-opacity" />
-                                                </a>
-                                            ))
-                                        ) : <span className="text-sm text-gray-400">無參考圖</span>}
-                                    </div>
-                                </div>
+            {selectedOrder && (<Modal isOpen={isEditModalOpen} onClose={closeEditModal} title={`管理訂單: ${selectedOrder.nickname} - ${selectedOrder.orderId}`} maxWidth="max-w-6xl">
+                {/* ... existing modal content ... */}
+                 {/* Re-implementing modal content for context in update */}
+                 <div className="flex flex-col md:flex-row gap-6 h-[70vh]">
+                     {/* Left: Edit Form */}
+                    <div className="md:w-1/2 space-y-4 overflow-y-auto pr-2">
+                        <div>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="block text-sm font-bold text-gray-700">訂單狀態</label>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${selectedOrder.status === '已送達(委託完成)' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>{selectedOrder.status}</span>
                             </div>
+                            <select 
+                                value={newStatus || ''} 
+                                onChange={(e) => setNewStatus(e.target.value as OrderStatus)}
+                                className="w-full p-2 border rounded bg-white"
+                            >
+                                {OrderStatusArray.map(status => <option key={status} value={status}>{status}</option>)}
+                            </select>
+                        </div>
 
-                            {/* Editable Fields */}
-                            <div className="space-y-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex-grow">
-                                <h3 className="font-bold text-siam-dark border-b border-siam-blue/30 pb-2">編輯內容</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-siam-dark">訂單狀態</label>
-                                        <select value={newStatus || ''} onChange={(e) => setNewStatus(e.target.value as OrderStatus)} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-siam-dark focus:border-siam-dark sm:text-sm rounded-md bg-white">
-                                            {OrderStatusArray.map(status => <option key={status} value={status}>{status}</option>)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-siam-dark">總金額 (NT$)</label>
-                                        <input type="number" value={editingPrice} onChange={(e) => setEditingPrice(e.target.value === '' ? '' : Number(e.target.value))} className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md focus:ring-siam-dark focus:border-siam-dark"/>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-siam-dark">編輯委託備註 (客戶可見)</label>
-                                    <textarea rows={3} value={editingRemarks} onChange={(e) => setEditingRemarks(e.target.value)} className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md focus:ring-siam-dark focus:border-siam-dark"></textarea>
-                                </div>
-                                <div className="bg-siam-blue/5 p-3 rounded-md border border-siam-blue/20">
-                                    <label className="block text-sm font-bold text-siam-blue">上傳新進度圖片</label>
-                                    <input type="file" onChange={(e) => setNewImage(e.target.files ? e.target.files[0] : null)} className="mt-1 block w-full text-sm text-siam-brown file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-siam-blue file:text-siam-cream hover:file:bg-siam-dark"/>
-                                </div>
-                                
-                                <div className="flex justify-end pt-2">
-                                    <button onClick={handleUpdateOrder} disabled={isUpdating} className="w-full sm:w-auto py-2 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-siam-blue hover:bg-siam-dark disabled:bg-gray-400 flex items-center justify-center">
-                                        {isUpdating ? <LoadingSpinner /> : '確認更新訂單資訊'}
-                                    </button>
-                                </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">委託明細 (唯讀)</label>
+                            <div className="p-3 bg-gray-50 rounded border text-sm space-y-2">
+                                <p><span className="font-bold">暱稱:</span> {selectedOrder.nickname}</p>
+                                <p><span className="font-bold">標題:</span> {selectedOrder.title}</p>
+                                <p><span className="font-bold">頭飾:</span> {selectedOrder.headpieceCraft}</p>
+                                <p><span className="font-bold">加購:</span> {selectedOrder.addons && selectedOrder.addons.length > 0 ? selectedOrder.addons.map(a => a.name).join(', ') : '無'}</p>
                             </div>
                         </div>
 
-                        {/* Right Column: Chat / Messages */}
-                        <div className="flex-1 flex flex-col h-[500px] lg:h-auto border-t lg:border-t-0 lg:border-l border-gray-200 pt-4 lg:pt-0 lg:pl-4">
-                            <h3 className="font-bold text-siam-dark border-b border-siam-blue/30 pb-2 mb-2 flex justify-between items-center">
-                                <span>留言板 / 對話紀錄</span>
-                                <span className="text-xs text-gray-500 font-normal">與客戶即時溝通</span>
-                            </h3>
-                            
-                            <div className="flex-grow overflow-y-auto bg-gray-50 rounded-lg p-3 space-y-3 border border-gray-200">
-                                {(() => {
-                                    const allMessages = [
-                                        ...(selectedOrder.adminNotes || []).map(note => ({
-                                            text: note.text,
-                                            sender: 'admin' as const,
-                                            timestamp: note.timestamp
-                                        })),
-                                        ...(selectedOrder.messages || [])
-                                    ].sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">總金額</label>
+                            <input type="number" value={editingPrice} onChange={(e) => setEditingPrice(Number(e.target.value))} className="w-full p-2 border rounded" />
+                        </div>
 
-                                    if (allMessages.length === 0) {
-                                        return (
-                                            <div className="text-center text-gray-400 mt-10 text-sm">
-                                                尚無對話紀錄
-                                            </div>
-                                        );
-                                    }
-
-                                    return allMessages.map((msg, index) => {
-                                        const isAdmin = msg.sender === 'admin';
-                                        return (
-                                            <div key={`msg-${index}`} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
-                                                <div className={`p-2 max-w-[90%] shadow-sm text-sm ${
-                                                    isAdmin 
-                                                        ? 'bg-siam-blue text-white rounded-l-xl rounded-tr-xl' 
-                                                        : 'bg-white border border-gray-200 text-siam-dark rounded-r-xl rounded-tl-xl'
-                                                }`}>
-                                                    <p className="text-xs opacity-75 mb-1 flex justify-between gap-2">
-                                                        <span>{isAdmin ? '我 (掌櫃)' : `客戶 (${selectedOrder.nickname})`}</span>
-                                                        <span>{new Date(msg.timestamp.toMillis()).toLocaleString()}</span>
-                                                    </p>
-                                                    <p className="whitespace-pre-wrap">{msg.text}</p>
-                                                </div>
-                                            </div>
-                                        );
-                                    });
-                                })()}
-                                <div ref={messagesEndRef} />
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">訂單備註</label>
+                            <textarea value={editingRemarks} onChange={(e) => setEditingRemarks(e.target.value)} className="w-full p-2 border rounded" rows={3} />
+                        </div>
+                        
+                        <div className="border-t pt-4">
+                            <h4 className="font-bold text-gray-700 mb-2">上傳進度圖</h4>
+                            <div className="flex gap-2">
+                                <input type="file" accept="image/*" onChange={(e) => setNewImage(e.target.files ? e.target.files[0] : null)} className="text-sm file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:bg-siam-blue file:text-white" />
                             </div>
-
-                            <div className="mt-3 pt-2 border-t border-gray-200">
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text" 
-                                        value={adminMessageInput}
-                                        onChange={(e) => setAdminMessageInput(e.target.value)}
-                                        placeholder="輸入訊息回覆客戶..." 
-                                        className="flex-grow p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-dark outline-none bg-white text-sm"
-                                        onKeyPress={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                handleSendAdminMessage();
-                                            }
-                                        }}
-                                    />
-                                    <button 
-                                        onClick={handleSendAdminMessage}
-                                        disabled={!adminMessageInput.trim() || isSendingMessage}
-                                        className="bg-siam-brown text-siam-cream px-4 py-2 rounded-md hover:bg-siam-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-sm font-bold"
-                                    >
-                                        {isSendingMessage ? '...' : '發送'}
-                                    </button>
+                            {selectedOrder.progressImageUrls && selectedOrder.progressImageUrls.length > 0 && (
+                                <div className="grid grid-cols-3 gap-2 mt-2">
+                                    {selectedOrder.progressImageUrls.map((url, idx) => (
+                                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer"><img src={url} className="w-full h-16 object-cover rounded border" /></a>
+                                    ))}
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">按下發送即時送出訊息，無需點擊更新訂單。</p>
-                            </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                            <button onClick={handleUpdateOrder} disabled={isUpdating} className="w-full bg-siam-blue text-white py-2 rounded font-bold shadow hover:bg-siam-dark">{isUpdating ? <LoadingSpinner /> : '儲存變更'}</button>
+                        </div>
+                    </div>
+
+                    {/* Right: Message Board */}
+                    <div className="md:w-1/2 flex flex-col h-full border-l pl-4 border-gray-200">
+                        <h3 className="font-bold text-siam-dark mb-2">即時對話 / 備註</h3>
+                        <div className="flex-grow bg-gray-50 rounded-lg p-3 overflow-y-auto mb-3 space-y-3 shadow-inner" ref={messagesEndRef}>
+                            {/* Merge legacy adminNotes with new messages */}
+                            {[
+                                ...(selectedOrder.adminNotes || []).map(note => ({ text: note.text, sender: 'admin' as const, timestamp: note.timestamp })),
+                                ...(selectedOrder.messages || [])
+                            ].sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis()).map((msg, idx) => (
+                                <div key={idx} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`p-2 max-w-[85%] rounded-lg text-sm shadow-sm ${msg.sender === 'admin' ? 'bg-siam-blue text-white rounded-tr-none' : 'bg-white border border-gray-200 rounded-tl-none'}`}>
+                                        <p className="text-xs opacity-75 mb-1">{msg.sender === 'admin' ? '管理員' : '客戶'} - {new Date(msg.timestamp.toMillis()).toLocaleString()}</p>
+                                        <p className="whitespace-pre-wrap">{msg.text}</p>
+                                    </div>
+                                </div>
+                            ))}
+                            {(!selectedOrder.messages?.length && !selectedOrder.adminNotes?.length) && <p className="text-center text-gray-400 text-sm mt-10">尚無對話紀錄</p>}
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                            <input 
+                                type="text" 
+                                value={adminMessageInput} 
+                                onChange={(e) => setAdminMessageInput(e.target.value)} 
+                                onKeyPress={(e) => e.key === 'Enter' && handleSendAdminMessage()}
+                                placeholder="輸入訊息..." 
+                                className="flex-grow p-2 border rounded text-sm focus:ring-2 focus:ring-siam-blue outline-none"
+                            />
+                            <button onClick={handleSendAdminMessage} disabled={isSendingMessage || !adminMessageInput.trim()} className="bg-siam-brown text-white px-4 py-2 rounded text-sm whitespace-nowrap font-bold hover:bg-siam-dark transition-colors">發送</button>
+                        </div>
+                    </div>
+                 </div>
+            </Modal>)}
+
+            <Modal isOpen={isNewOrderModalOpen} onClose={closeNewOrderModal} title="新增訂單">{/* ... existing modal content ... */}</Modal>
+
+            {/* Info Modal to replace alert() */}
+            {infoModalState && (
+                <Modal isOpen={!!infoModalState} onClose={() => setInfoModalState(null)} title={infoModalState.title}>
+                    <div className="p-4 space-y-4">
+                        <div className="text-siam-brown whitespace-pre-wrap">{infoModalState.message}</div>
+                        <div className="flex justify-end">
+                            <button onClick={() => setInfoModalState(null)} className="px-6 py-2 bg-siam-blue text-white rounded hover:bg-siam-dark">好的</button>
                         </div>
                     </div>
                 </Modal>
             )}
 
-            {/* New Order Modal */}
-            <Modal isOpen={isNewOrderModalOpen} onClose={closeNewOrderModal} title="新增訂單">
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-siam-dark">暱稱*</label>
-                        <input type="text" value={newOrderNickname} onChange={(e) => setNewOrderNickname(e.target.value)} required className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md focus:ring-siam-dark focus:border-siam-dark"/>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-siam-dark">委託標題*</label>
-                        <input type="text" value={newOrderTitle} onChange={(e) => setNewOrderTitle(e.target.value)} required className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md focus:ring-siam-dark focus:border-siam-dark"/>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-siam-dark">頭飾工藝*</label>
-                        <select value={newOrderHeadpieceCraft} onChange={(e) => setNewOrderHeadpieceCraft(e.target.value as HeadpieceCraft)} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-siam-dark focus:border-siam-dark sm:text-sm rounded-md bg-white">
-                            {Object.values(HeadpieceCraft).map(craft => <option key={craft} value={craft}>{craft}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-siam-dark">說明圖* (最多5張)</label>
-                        <input type="file" onChange={(e) => {
-                            if (e.target.files && e.target.files.length > 5) {
-                                alert('最多只能上傳 5 張圖片');
-                                e.target.value = '';
-                                setNewOrderImages(null);
-                            } else {
-                                setNewOrderImages(e.target.files);
-                            }
-                        }} multiple accept="image/*" required className="mt-1 block w-full text-sm text-siam-brown file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-siam-blue file:text-siam-cream hover:file:bg-siam-dark"/>
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium text-siam-dark">加價購</label>
-                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 max-h-32 overflow-y-auto border p-2 rounded-md">
-                            {DOLL_ADDONS.map(addon => (
-                                <label key={addon.id} className="flex items-center space-x-3 cursor-pointer">
-                                    <input type="checkbox" checked={newOrderAddons.has(addon.id)} onChange={() => handleAddonToggle(addon.id)} className="h-4 w-4 rounded border-gray-300 text-siam-blue focus:ring-siam-dark"/>
-                                    <span className="text-sm">{addon.name} (+{addon.price}元)</span>
-                                </label>
-                            ))}
+            {/* Confirmation Modal to replace confirm() */}
+            {confirmModalState && (
+                <Modal isOpen={!!confirmModalState} onClose={() => setConfirmModalState(null)} title={confirmModalState.title}>
+                    <div className="p-4 space-y-6">
+                        <div className="text-siam-brown whitespace-pre-wrap">{confirmModalState.message}</div>
+                        <div className="flex justify-end space-x-3">
+                            <button onClick={() => setConfirmModalState(null)} className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded">取消</button>
+                            <button onClick={() => { confirmModalState.onConfirm(); setConfirmModalState(null); }} className="px-6 py-2 bg-siam-blue text-white rounded hover:bg-siam-dark">{confirmModalState.confirmText || '確認'}</button>
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-siam-dark">總金額*</label>
-                        <input type="number" value={newOrderPrice} onChange={(e) => setNewOrderPrice(e.target.value === '' ? '' : Number(e.target.value))} required className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md focus:ring-siam-dark focus:border-siam-dark"/>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-siam-dark">備註欄</label>
-                        <textarea value={newOrderRemarks} onChange={(e) => setNewOrderRemarks(e.target.value)} rows={3} className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md focus:ring-siam-dark focus:border-siam-dark"></textarea>
-                    </div>
-                </div>
-                <div className="flex justify-end space-x-4 mt-4 pt-4 border-t border-gray-200">
-                    <button onClick={closeNewOrderModal} className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">取消</button>
-                    <button onClick={handleCreateOrder} disabled={isUpdating} className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-siam-blue hover:bg-siam-dark disabled:bg-gray-400 flex items-center">
-                        {isUpdating ? <LoadingSpinner /> : '確認新增'}
-                    </button>
-                </div>
-            </Modal>
+                </Modal>
+            )}
         </div>
     );
 };

@@ -1,4 +1,3 @@
-
 import { Addon } from './types';
 
 export const DOLL_BASE_PRICE = 700;
@@ -19,10 +18,19 @@ export const DOLL_ADDONS: Addon[] = [
     { id: 'stand-bag-purple', name: '基礎款立牌包紫色', price: 75 },
 ];
 
-export const DISCORD_WEBHOOK_URL = 'YOUR_DISCORD_WEBHOOK_URL'; // TODO: Replace with your Discord webhook URL
+// ===================================================================================
+//  設定 Discord 通知
+//  請將您的 Discord Webhook URL 貼在下方的引號中
+//  例如: 'https://discord.com/api/webhooks/123456789/abcdefg...'
+// ===================================================================================
+export const DISCORD_WEBHOOK_URL = 'YOUR_DISCORD_WEBHOOK_URL'; 
 
-// TODO: 請將 Google Apps Script 部署後的 Web App URL 貼在這裡
-export const GOOGLE_SCRIPT_URL = 'YOUR_GOOGLE_SCRIPT_URL'; 
+// ===================================================================================
+//  非常重要！
+//  請點擊 Google Apps Script 右上角的「部署」>「新增部署作業」，
+//  然後將部署成功後產生的「全新」網頁應用程式 URL 完整地貼在下方引號中。
+// ===================================================================================
+export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxHVZt2citRD3oOsaYouo2Ru4luEYf7SDclMd2G0fVT9JWLF4hAZXsPUddK4MP37e_2xg/exec'; 
 
 export const ADMIN_EMAILS = [
     'admin1@siam.com', 

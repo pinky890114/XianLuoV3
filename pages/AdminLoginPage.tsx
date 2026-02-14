@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { signInWithPopup, signOut } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider } from '../firebaseConfig';
 import { ADMIN_EMAILS } from '../constants';
@@ -10,6 +10,16 @@ const AdminLoginPage: React.FC = () => {
     const [error, setError] = useState('');
     const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+    // 如果已經登入且在白名單內，直接導向管理首頁
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user && user.email && ADMIN_EMAILS.includes(user.email)) {
+                navigate('/admin');
+            }
+        });
+        return () => unsubscribe();
+    }, [navigate]);
+
     const handleGoogleLogin = async () => {
         setIsLoggingIn(true);
         setError('');
@@ -18,17 +28,14 @@ const AdminLoginPage: React.FC = () => {
             const user = result.user;
 
             if (user.email && ADMIN_EMAILS.includes(user.email)) {
-                // 登入成功且在白名單內
                 navigate('/admin');
             } else {
-                // 登入成功但不在白名單內，強制登出並顯示錯誤
                 await signOut(auth);
                 setError('抱歉，您的 Email 不在管理員名單中。');
             }
         } catch (err: any) {
             console.error("Login Error:", err);
             
-            // 處理常見錯誤代碼
             if (err.code === 'auth/unauthorized-domain') {
                 setError('網域未授權 (Unauthorized Domain)。\n請至 Firebase Console > Authentication > Settings > Authorized domains 新增目前網域。');
             } else if (err.code === 'auth/popup-closed-by-user') {
@@ -82,7 +89,7 @@ const AdminLoginPage: React.FC = () => {
                 
                 <div className="mt-6">
                     <button onClick={() => navigate('/')} className="text-sm text-siam-blue hover:underline">
-                        返回首頁
+                        返回店鋪首頁
                     </button>
                 </div>
             </div>

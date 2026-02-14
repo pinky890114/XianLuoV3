@@ -32,15 +32,30 @@ function FooterContent() {
   const adminLinkDestination = isAdminPage ? '/' : '/admin';
 
   return (
-    <footer className="w-full text-center py-4 text-siam-brown">
-      <div className="flex flex-col justify-center items-center space-y-1">
-         <span>© Shenli</span>
-         {/* Only show the key icon if NOT on admin pages to keep backend cleaner */}
-         {!isAdminPage && (
-             <Link to={adminLinkDestination} aria-label="前往管理後台">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-20 hover:opacity-100 transition-opacity"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-             </Link>
-         )}
+    <footer className="w-full text-center py-6 text-siam-brown">
+      <div className="flex flex-col justify-center items-center space-y-2">
+         <span className="text-xs opacity-50 uppercase tracking-widest font-bold">© Shenli Production</span>
+         <Link 
+            to={adminLinkDestination} 
+            aria-label={isAdminPage ? "返回店鋪首頁" : "前往管理後台"}
+            className="p-2 rounded-full hover:bg-white/40 transition-all group"
+         >
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="20" 
+              height="20" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              className={`transition-all ${isAdminPage ? 'text-siam-blue' : 'opacity-20 group-hover:opacity-100'}`}
+            >
+              <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+         </Link>
       </div>
     </footer>
   );
@@ -49,13 +64,9 @@ function FooterContent() {
 
 function App() {
   // 自動匿名登入邏輯：僅當目前沒有使用者登入時才執行。
-  // 這確保了一般用戶可以存取資料庫，但不會覆蓋掉管理員的 Google 登入狀態。
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        // 沒有使用者 (例如：剛進網站、或者管理員登出後) -> 嘗試匿名登入
-        // 注意：這會導致在登入頁面管理員登出後，馬上又變成匿名使用者。
-        // 但 ProtectedRoute 會檢查 email，匿名使用者沒有 email，所以依然會被擋在後台之外。
         signInAnonymously(auth).catch((error) => {
           console.error("Anonymous auth failed.", error);
         });

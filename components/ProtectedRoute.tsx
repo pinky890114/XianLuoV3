@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
+import { ADMIN_EMAILS } from '../constants';
 import LoadingSpinner from './LoadingSpinner';
 
 interface ProtectedRouteProps {
@@ -10,35 +11,47 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  // 登入功能已暫時禁用，以便在開發階段輕鬆訪問儀表板。
-  // 若要重新啟用，請取消註解下方的原始程式碼，並移除 return <>{children}</>; 這一行。
-  return <>{children}</>;
-
-  /*
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setIsAuthenticated(true);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      
+      // 檢查邏輯：
+      // 1. 使用者必須存在
+      // 2. 使用者必須有 email (匿名登入沒有 email)
+      // 3. Email 必須在白名單內
+      if (currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email)) {
+        setIsAuthorized(true);
       } else {
-        setIsAuthenticated(false);
+        setIsAuthorized(false);
       }
+      
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  if (isAuthenticated === null) {
+  if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <LoadingSpinner />
+      <div className="flex justify-center items-center h-screen bg-siam-cream">
+        <div className="text-center">
+            <LoadingSpinner />
+            <p className="mt-4 text-siam-brown">驗證身份中...</p>
+        </div>
       </div>
     );
   }
 
-  return isAuthenticated ? <>{children}</> : <Navigate to="/admin" />;
-  */
+  // 如果未授權，導向登入頁面
+  if (!isAuthorized) {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

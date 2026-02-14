@@ -272,7 +272,6 @@ const AdminDollsDashboardPage: React.FC = () => {
         }
         setIsUpdating(true);
         try {
-            // Fix: Explicitly type `file` as `File` to resolve a TypeScript error where it was incorrectly inferred as `unknown`.
             const uploadPromises = Array.from(newOrderImages).map((file: File) => uploadAndCompressImage(file, 'doll-references', 'reference'));
             const imageUrls = await Promise.all(uploadPromises);
             const newOrderData = {
@@ -429,7 +428,7 @@ const AdminDollsDashboardPage: React.FC = () => {
                 )}
             </div>
             
-            {/* ... Modal definitions remain largely the same, just checking the dropdown ... */}
+            {/* ... Modal definitions ... */}
             
             {selectedOrder && (<Modal isOpen={isEditModalOpen} onClose={closeEditModal} title={`管理訂單: ${selectedOrder.nickname} - ${selectedOrder.orderId}`} maxWidth="max-w-6xl">
                  <div className="flex flex-col md:flex-row gap-6 h-[70vh]">
@@ -444,7 +443,6 @@ const AdminDollsDashboardPage: React.FC = () => {
                                 onChange={(e) => setNewStatus(e.target.value as OrderStatus)}
                                 className="w-full p-2 border rounded bg-white"
                             >
-                                {/* Only use DollOrderStatusArray here */}
                                 {DollOrderStatusArray.map(status => <option key={status} value={status}>{status}</option>)}
                             </select>
                         </div>

@@ -1,3 +1,4 @@
+
 import { Addon } from './types';
 
 export const DOLL_BASE_PRICE = 700;
@@ -23,7 +24,7 @@ export const DOLL_ADDONS: Addon[] = [
 //  請將您的 Discord Webhook URL 貼在下方的引號中
 //  例如: 'https://discord.com/api/webhooks/123456789/abcdefg...'
 // ===================================================================================
-export const DISCORD_WEBHOOK_URL = 'YOUR_DISCORD_WEBHOOK_URL'; 
+export const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1472270501874368532/YdQUojYp9v6rogI2oogBov0fTr699PHT__UtG1abBZ2e9tpH4ERWcpZwTtIjt5bThEU_'; 
 
 // ===================================================================================
 //  非常重要！
@@ -32,7 +33,11 @@ export const DISCORD_WEBHOOK_URL = 'YOUR_DISCORD_WEBHOOK_URL';
 // ===================================================================================
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxHVZt2citRD3oOsaYouo2Ru4luEYf7SDclMd2G0fVT9JWLF4hAZXsPUddK4MP37e_2xg/exec'; 
 
+// ===================================================================================
+//  後台管理員 Email 白名單
+//  請在下方填入允許進入後台的 Gmail 地址
+// ===================================================================================
 export const ADMIN_EMAILS = [
-    'admin1@siam.com', 
-    'admin2@siam.com'
-]; // Note: For a real app, manage admin roles in Firebase, not client-side.
+    'chipmangochan@gmail.com',
+    'pinky890114@gmail.com'
+];

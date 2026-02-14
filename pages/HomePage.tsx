@@ -31,7 +31,7 @@ const navButtons = [
 
 const HomePage: React.FC = () => {
   return (
-    <div className="min-h-screen flex flex-col items-center p-6 text-center bg-siam-cream pt-32 md:pt-48">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-siam-cream">
       
       <header className="mb-16 animate-fadeIn">
         <h1 className="text-4xl md:text-5xl font-bold text-siam-dark tracking-wider mb-4">

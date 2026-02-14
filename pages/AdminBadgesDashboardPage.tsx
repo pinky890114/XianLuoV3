@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, doc, addDoc, updateDoc, deleteDoc, writeBatch, Timestamp, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../firebaseConfig';
-import { Product, ProductSpec, BadgeOrder, OrderStatus, OrderStatusArray } from '../types';
+import { Product, ProductSpec, BadgeOrder, OrderStatus, BadgeOrderStatusArray } from '../types';
 import { uploadAndCompressImage } from '../utils/imageUploader';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Modal from '../components/Modal';
@@ -35,9 +36,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
     const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
     const [isBatchDeleteModalOpen, setIsBatchDeleteModalOpen] = useState(false);
     const [batchDeleteInput, setBatchDeleteInput] = useState('');
-    const [isSyncing, setIsSyncing] = useState(false);
-    const [syncProgress, setSyncProgress] = useState('');
-
+    
     // Order Edit Modal States
     const [isOrderEditModalOpen, setIsOrderEditModalOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<BadgeOrder | null>(null);
@@ -55,7 +54,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
     const [newOrderNickname, setNewOrderNickname] = useState('');
     const [newOrderPrice, setNewOrderPrice] = useState<number | ''>('');
     const [newOrderRemarks, setNewOrderRemarks] = useState('');
-    const [newOrderStatusManual, setNewOrderStatusManual] = useState<OrderStatus>(OrderStatus.ACCEPTED);
+    const [newOrderStatusManual, setNewOrderStatusManual] = useState<OrderStatus>(OrderStatus.QUANTITY_SURVEY);
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -297,37 +296,6 @@ const AdminBadgesDashboardPage: React.FC = () => {
         }
     };
 
-    const handleBatchSync = () => {
-        setConfirmModalState({
-            title: '全部同步',
-            message: `確定要將全部 ${orders.length} 筆訂單同步到 Google Sheets 嗎？`,
-            confirmText: '開始同步',
-            onConfirm: async () => {
-                setIsSyncing(true);
-                setSyncProgress(`(0/${orders.length})`);
-                let successCount = 0;
-                let errorCount = 0;
-                const sortedOrders = [...orders].sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
-
-                for (let i = 0; i < sortedOrders.length; i++) {
-                    const order = sortedOrders[i];
-                    try {
-                        await syncOrderToGoogleSheet(order, 'badge');
-                        successCount++;
-                    } catch (error) {
-                        console.error(`Failed to sync order ${order.orderId}:`, error);
-                        errorCount++;
-                    }
-                    setSyncProgress(`(${i + 1}/${sortedOrders.length})`);
-                }
-
-                setIsSyncing(false);
-                setSyncProgress('');
-                setInfoModalState({ title: '同步完成', message: `成功: ${successCount} 筆\n失敗: ${errorCount} 筆` });
-            }
-        });
-    };
-
     // --- Order Edit Modal Logic ---
 
     const openOrderEditModal = (order: BadgeOrder) => {
@@ -392,7 +360,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
         setNewOrderNickname('');
         setNewOrderPrice('');
         setNewOrderRemarks('');
-        setNewOrderStatusManual(OrderStatus.ACCEPTED);
+        setNewOrderStatusManual(OrderStatus.QUANTITY_SURVEY); // Default to first step
         setIsNewOrderModalOpen(true);
     };
 
@@ -456,7 +424,8 @@ const AdminBadgesDashboardPage: React.FC = () => {
     return (
         <div className="container mx-auto p-4 md:p-8">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <div>
+                {/* ... header content ... */}
+                 <div>
                     <Link to="/admin" className="text-siam-blue hover:text-siam-dark transition-colors mb-2 inline-flex items-center space-x-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                         <span>返回管理選單</span>
@@ -475,14 +444,6 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                     刪除選取 ({selectedOrderIds.size})
                                 </button>
                             )}
-                            <button
-                                onClick={handleBatchSync}
-                                disabled={isSyncing || isLoading || orders.length === 0}
-                                className="bg-white text-green-700 py-2 px-4 rounded-md shadow-sm hover:bg-gray-50 transition-all flex items-center gap-2 border border-green-700/30 disabled:opacity-50"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
-                                {isSyncing ? `同步中... ${syncProgress}` : '全部同步'}
-                            </button>
                         </>
                     )}
 
@@ -500,10 +461,12 @@ const AdminBadgesDashboardPage: React.FC = () => {
                 </div>
             </header>
 
+            {/* ... Content ... */}
             {isLoading ? (
                 <div className="flex justify-center p-20"><LoadingSpinner /></div>
             ) : activeTab === 'products' ? (
-                <div className="space-y-12">
+                /* ... Product Tab ... */
+                 <div className="space-y-12">
                     {CATEGORIES.map(cat => (
                         <div key={cat} className="space-y-4">
                             <div className="flex justify-between items-center border-b-2 border-siam-blue pb-2">
@@ -541,6 +504,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
                     ))}
                 </div>
             ) : (
+                /* ... Order Tab ... */
                 <div className="bg-white rounded-xl shadow border p-6">
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-siam-blue">
@@ -574,9 +538,10 @@ const AdminBadgesDashboardPage: React.FC = () => {
                 </div>
             )}
 
-            {/* 新增系列 Modal */}
+            {/* ... Add Series Modal ... */}
             <Modal isOpen={isAddSeriesModalOpen} onClose={() => setIsAddSeriesModalOpen(false)} title={`在 [${newSeriesCategory}] 新增系列`}>
-                <div className="space-y-4">
+                {/* ... content same as before ... */}
+                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">系列名稱</label>
                         <input 
@@ -597,10 +562,11 @@ const AdminBadgesDashboardPage: React.FC = () => {
                 </div>
             </Modal>
 
-            {/* 新增訂單 (手動補單) Modal */}
+            {/* ... Manual Order Modal ... */}
             <Modal isOpen={isNewOrderModalOpen} onClose={() => setIsNewOrderModalOpen(false)} title="手動新增訂單 (補單)" maxWidth="max-w-4xl">
                  <div className="space-y-6">
-                    <div>
+                    {/* ... Step 1, 2, 3 ... same as before */}
+                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">1. 選擇類別</label>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             {CATEGORIES.map(cat => (
@@ -612,7 +578,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-2">2. 選擇系列</label>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-1">
-                                {filteredSeriesForNewOrder.map(p => (
+                                {products.filter(p => p.categoryId === newOrderCat).map(p => (
                                     <button key={p.id} onClick={() => { setNewOrderSeriesId(p.id); setNewOrderSpecIndex(null); }} className={`py-3 px-2 rounded border text-sm font-bold ${newOrderSeriesId === p.id ? 'bg-siam-blue text-white' : 'bg-white'}`}>{p.seriesName}</button>
                                 ))}
                             </div>
@@ -628,10 +594,14 @@ const AdminBadgesDashboardPage: React.FC = () => {
                             </div>
                         </div>
                     )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                         <input type="text" value={newOrderNickname} onChange={e => setNewOrderNickname(e.target.value)} className="w-full p-2 border rounded" placeholder="暱稱" />
                         <input type="number" value={newOrderPrice} onChange={e => setNewOrderPrice(e.target.value ? Number(e.target.value) : '')} className="w-full p-2 border rounded" placeholder="價格" />
-                        <select value={newOrderStatusManual} onChange={e => setNewOrderStatusManual(e.target.value as OrderStatus)} className="w-full p-2 border rounded bg-white">{OrderStatusArray.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <select value={newOrderStatusManual} onChange={e => setNewOrderStatusManual(e.target.value as OrderStatus)} className="w-full p-2 border rounded bg-white">
+                             {/* Only Badge Statuses */}
+                             {BadgeOrderStatusArray.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
                         <textarea value={newOrderRemarks} onChange={e => setNewOrderRemarks(e.target.value)} className="w-full p-2 border rounded col-span-full" placeholder="備註" rows={2} />
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t">
@@ -641,9 +611,10 @@ const AdminBadgesDashboardPage: React.FC = () => {
                 </div>
             </Modal>
 
-            {/* 編輯系列 Modal */}
+            {/* ... Product Edit Modal ... */}
             {editingProduct && (
                 <Modal isOpen={isProductEditModalOpen} onClose={() => setIsProductEditModalOpen(false)} title="編輯商品系列" maxWidth="max-w-4xl">
+                     {/* ... Same as before ... */}
                      <div className="space-y-6">
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-2">系列名稱</label>
@@ -706,7 +677,8 @@ const AdminBadgesDashboardPage: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">訂單狀態</label>
                                 <select value={newOrderStatus || ''} onChange={(e) => setNewOrderStatus(e.target.value as OrderStatus)} className="w-full p-2 border rounded bg-white">
-                                    {OrderStatusArray.map(status => <option key={status} value={status}>{status}</option>)}
+                                    {/* Only BadgeOrderStatusArray */}
+                                    {BadgeOrderStatusArray.map(status => <option key={status} value={status}>{status}</option>)}
                                 </select>
                             </div>
                             <div>
@@ -745,8 +717,8 @@ const AdminBadgesDashboardPage: React.FC = () => {
                 </Modal>
             )}
 
-            {/* 批次刪除 Modal */}
-            <Modal isOpen={isBatchDeleteModalOpen} onClose={() => setIsBatchDeleteModalOpen(false)} title="⚠️ 批次刪除確認">
+            {/* ... Batch Delete, Info, Confirm Modals ... */}
+             <Modal isOpen={isBatchDeleteModalOpen} onClose={() => setIsBatchDeleteModalOpen(false)} title="⚠️ 批次刪除確認">
                 <div className="space-y-4">
                     <div className="bg-red-50 border border-red-200 rounded p-4 text-red-700">
                         <p className="font-bold text-lg mb-2">嚴重警告：此動作無法復原！</p>
@@ -762,9 +734,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
                     </div>
                 </div>
             </Modal>
-
-            {/* 訊息提示 Modal */}
-            {infoModalState && (
+             {infoModalState && (
                 <Modal isOpen={!!infoModalState} onClose={() => setInfoModalState(null)} title={infoModalState.title}>
                     <div className="p-4 space-y-4">
                         <div className="text-siam-brown whitespace-pre-wrap">{infoModalState.message}</div>
@@ -774,8 +744,6 @@ const AdminBadgesDashboardPage: React.FC = () => {
                     </div>
                 </Modal>
             )}
-
-            {/* 確認對話 Modal */}
             {confirmModalState && (
                 <Modal isOpen={!!confirmModalState} onClose={() => setConfirmModalState(null)} title={confirmModalState.title}>
                     <div className="p-4 space-y-6">

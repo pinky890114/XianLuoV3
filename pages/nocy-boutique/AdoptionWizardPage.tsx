@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { addDoc, collection, serverTimestamp, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
@@ -5,7 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../firebaseConfig';
 import { HeadpieceCraft, Addon, OrderStatus } from '../../types';
 import { DOLL_BASE_PRICE, DOLL_ADDONS } from '../../constants';
-import { sendDiscordNotification } from '../../services/discordService';
+import { sendDollOrderNotification } from '../../services/discordService';
 import { uploadAndCompressImage } from '../../utils/imageUploader';
 import { syncOrderToGoogleSheet } from '../../services/googleSheetsService';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -197,15 +198,15 @@ const AdoptionWizardPage: React.FC = () => {
             await addDoc(collection(db, 'dollOrders'), newOrderData);
 
             // Send to Discord
-            await sendDiscordNotification({
+            await sendDollOrderNotification({
+                orderId,
                 nickname,
                 title,
                 headpieceCraft,
                 referenceImageUrls: imageUrls,
                 remarks,
                 addons: addonList,
-                totalPrice: calculatedPrice,
-                messages: []
+                totalPrice: calculatedPrice
             });
             
             // Sync to Google Sheet (using client-side generated timestamp for simplicity in this flow)

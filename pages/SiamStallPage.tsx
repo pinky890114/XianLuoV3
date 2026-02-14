@@ -6,6 +6,7 @@ import { db } from '../firebaseConfig';
 import { Product, OrderStatus, BadgeOrder } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { syncOrderToGoogleSheet } from '../services/googleSheetsService';
+import { sendBadgeOrderNotification } from '../services/discordService';
 
 const CATEGORIES = ['快閃櫥窗', '金屬徽章', '棉花製品'];
 
@@ -145,7 +146,8 @@ const SiamStallPage: React.FC = () => {
                 nickname,
                 productTitle: fullContentString, 
                 price: totalPrice,
-                status: OrderStatus.PENDING,
+                // Change initial status to QUANTITY_SURVEY
+                status: OrderStatus.QUANTITY_SURVEY,
                 messages: [],
                 progressImageUrls: [],
                 remarks: remarks || '無', 
@@ -158,6 +160,15 @@ const SiamStallPage: React.FC = () => {
                 ...orderData, 
                 createdAt: now 
             } as any, 'badge');
+
+            // Send notification to Discord
+            await sendBadgeOrderNotification({
+                orderId,
+                nickname,
+                productTitle: fullContentString,
+                price: totalPrice,
+                remarks: remarks
+            });
 
             setSubmittedOrderId(orderId);
             setStep(3);

@@ -14,8 +14,11 @@ export interface Addon {
 }
 
 export enum OrderStatus {
+    // --- Common / Legacy ---
     PENDING = '掌櫃確認中',
     ACCEPTED = '委託成立',
+    
+    // --- Doll Flow ---
     CONCEPT_DRAWING = '效果圖繪製中',
     CONCEPT_REVIEW = '效果圖確認中',
     CONCEPT_CONFIRMED = '效果圖已確認',
@@ -27,9 +30,21 @@ export enum OrderStatus {
     SIAM_SORTING = '暹羅分裝中',
     SIAM_SHIPPED = '暹羅已出貨',
     DELIVERED = '已送達',
+
+    // --- Badge/Stall Flow (New) ---
+    QUANTITY_SURVEY = '數量調查中',
+    SHARED_PAYMENT = '均攤收款中',
+    SAMPLE_PRODUCTION = '樣品製作中',
+    BULK_PAYMENT = '大貨收款中',
+    LEADER_SHIPPING = '團主出貨中',
+    CONSOLIDATED_SHIPPING = '集運出貨中',
+    SIAM_PACKING = '暹羅打包中',
+    // SIAM_SHIPPED is shared
+    TRANSACTION_COMPLETE = '交易完成'
 }
 
-export const OrderStatusArray = [
+// 小餅訂單流程
+export const DollOrderStatusArray = [
     OrderStatus.PENDING,
     OrderStatus.ACCEPTED,
     OrderStatus.CONCEPT_DRAWING,
@@ -43,6 +58,26 @@ export const OrderStatusArray = [
     OrderStatus.SIAM_SORTING,
     OrderStatus.SIAM_SHIPPED,
     OrderStatus.DELIVERED,
+];
+
+// 地攤訂單流程
+export const BadgeOrderStatusArray = [
+    OrderStatus.QUANTITY_SURVEY,
+    OrderStatus.SHARED_PAYMENT,
+    OrderStatus.SAMPLE_PRODUCTION,
+    OrderStatus.BULK_PAYMENT,
+    OrderStatus.LEADER_SHIPPING,
+    OrderStatus.CONSOLIDATED_SHIPPING,
+    OrderStatus.WAREHOUSE_ARRIVED, // Optional: Keep warehouse logic if needed, or skip
+    OrderStatus.SIAM_PACKING,
+    OrderStatus.SIAM_SHIPPED,
+    OrderStatus.TRANSACTION_COMPLETE,
+];
+
+// Combine for legacy support or generic lookups if needed
+export const OrderStatusArray = [
+    ...DollOrderStatusArray,
+    ...BadgeOrderStatusArray
 ];
 
 export interface Message {

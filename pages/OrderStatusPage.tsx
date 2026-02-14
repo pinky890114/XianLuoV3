@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import { DollOrder, BadgeOrder, OrderStatusArray, OrderStatus } from '../types';
+import { DollOrder, BadgeOrder, DollOrderStatusArray, BadgeOrderStatusArray, OrderStatus } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
 import CareInstructions from '../components/CareInstructions';
 
@@ -113,7 +114,7 @@ const OrderStatusPage: React.FC = () => {
         return status;
     };
 
-    const getStatusIndex = (status: string) => OrderStatusArray.indexOf(normalizeStatus(status) as any);
+    const getStatusIndex = (status: string, statusArray: string[]) => statusArray.indexOf(normalizeStatus(status) as any);
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-5xl">
@@ -157,6 +158,9 @@ const OrderStatusPage: React.FC = () => {
                     const title = isDoll ? (order as DollOrder).title : (order as BadgeOrder).productTitle;
                     const price = isDoll ? (order as DollOrder).totalPrice : (order as BadgeOrder).price;
                     const dollOrder = isDoll ? (order as DollOrder) : null;
+                    
+                    // Select correct timeline array
+                    const currentStatusArray = isDoll ? DollOrderStatusArray : BadgeOrderStatusArray;
 
                     // Combine legacy adminNotes (Doll only) and new messages, then sort by timestamp
                     const allMessages = [
@@ -191,8 +195,8 @@ const OrderStatusPage: React.FC = () => {
                             {/* Mobile View: Vertical */}
                             <div className="md:hidden relative pl-4">
                                 <div className="absolute left-[29px] top-2 bottom-6 w-0.5 bg-gray-200 z-0"></div>
-                                {OrderStatusArray.map((status, index) => {
-                                    const currentIndex = getStatusIndex(order.status);
+                                {currentStatusArray.map((status, index) => {
+                                    const currentIndex = getStatusIndex(order.status, currentStatusArray);
                                     const isCompleted = index <= currentIndex;
                                     const isCurrent = index === currentIndex;
                                     const isPast = index < currentIndex;
@@ -210,22 +214,22 @@ const OrderStatusPage: React.FC = () => {
                             </div>
 
                             {/* Desktop View: Horizontal */}
-                            <div className="hidden md:flex items-center w-full overflow-x-auto pb-12 pt-4 px-20 hide-scrollbar">
-                                {OrderStatusArray.map((status, index) => {
-                                    const currentIndex = getStatusIndex(order.status);
+                            <div className="hidden md:flex items-center w-full overflow-x-auto pb-12 pt-4 px-10 hide-scrollbar">
+                                {currentStatusArray.map((status, index) => {
+                                    const currentIndex = getStatusIndex(order.status, currentStatusArray);
                                     const isCompleted = index <= currentIndex;
                                     const isCurrent = index === currentIndex;
                                     const isPast = index < currentIndex;
 
                                     return (
-                                        <div key={status} className="flex items-center min-w-[120px] flex-1 last:flex-none last:min-w-0">
+                                        <div key={status} className="flex items-center min-w-[100px] flex-1 last:flex-none last:min-w-0">
                                             <div className="flex flex-col items-center relative z-10">
                                                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${isCurrent ? 'border-siam-blue ring-4 ring-siam-blue/20 scale-125 bg-white' : isCompleted ? 'border-siam-blue bg-siam-blue' : 'border-gray-300 bg-gray-300'}`}>
                                                     {isCurrent && <div className="w-2 h-2 rounded-full bg-siam-blue"></div>}
                                                 </div>
-                                                <div className={`absolute top-8 w-32 text-center text-sm font-bold transition-colors duration-300 left-1/2 -translate-x-1/2 ${isCurrent ? 'text-siam-blue' : isCompleted ? 'text-siam-blue/80' : 'text-gray-400'}`}>{status}</div>
+                                                <div className={`absolute top-8 w-28 text-center text-xs font-bold transition-colors duration-300 left-1/2 -translate-x-1/2 ${isCurrent ? 'text-siam-blue' : isCompleted ? 'text-siam-blue/80' : 'text-gray-400'}`}>{status}</div>
                                             </div>
-                                            {index < OrderStatusArray.length - 1 && <div className={`h-1 flex-grow min-w-[3rem] mx-[-1px] z-0 ${isPast ? 'bg-siam-blue' : 'bg-gray-300'}`}></div>}
+                                            {index < currentStatusArray.length - 1 && <div className={`h-1 flex-grow min-w-[2rem] mx-[-1px] z-0 ${isPast ? 'bg-siam-blue' : 'bg-gray-300'}`}></div>}
                                         </div>
                                     );
                                 })}

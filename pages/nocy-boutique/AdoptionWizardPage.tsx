@@ -221,7 +221,7 @@ const AdoptionWizardPage: React.FC = () => {
                             </div>
                             <div>
                                 <label className="block font-bold text-siam-dark mb-1">委託內容（一套外觀一單） *</label>
-                                <input type="text" required value={title} onChange={e => setTitle(e.target.value)} className="w-full p-3 rounded-lg border focus:ring-2 focus:ring-siam-blue outline-none" placeholder="素體+頭髮+頭飾+衣服+手持物件，沒有的就不用列上去" />
+                                <input type="text" required value={title} onChange={e => setTitle(e.target.value)} className="w-full p-3 rounded-lg border focus:ring-2 focus:ring-siam-blue outline-none" placeholder="例：素體+頭髮+衣服，沒有就不寫" />
                             </div>
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
@@ -262,7 +262,7 @@ const AdoptionWizardPage: React.FC = () => {
                             </div>
                             <div>
                                 <label className="block font-bold text-siam-dark mb-1">備註</label>
-                                <textarea value={remarks} onChange={e => setRemarks(e.target.value)} className="w-full p-3 rounded-lg border focus:ring-2 focus:ring-siam-blue outline-none" rows={4} placeholder="任何需要以文字描述的細節都可以寫在這裡" />
+                                <textarea value={remarks} onChange={e => setRemarks(e.target.value)} className="w-full p-3 rounded-lg border focus:ring-2 focus:ring-siam-blue outline-none" rows={4} placeholder="想要委託包身盒子、手持物件、耳墜、頭飾、耳朵、掛寵（依複雜程度加價）或者任何需要以文字描述的細節都可以寫在這裡" />
                             </div>
                         </div>
                     </div>

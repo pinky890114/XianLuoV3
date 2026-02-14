@@ -179,7 +179,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
             await addDoc(collection(db, 'products'), {
                 categoryId: newSeriesCategory,
                 seriesName: newSeriesName.trim(),
-                specs: [{ specName: '預設規格', price: 0, imageUrl: '', isActive: true }]
+                specs: [{ specName: '預設規格', price: 0, imageUrl: '', isActive: false }] // Default inactive
             });
             await fetchData();
             setIsAddSeriesModalOpen(false);
@@ -200,7 +200,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
         if (!editingProduct) return;
         setEditingProduct({
             ...editingProduct,
-            specs: [...editingProduct.specs, { specName: '新規格', price: 0, imageUrl: '', isActive: true }]
+            specs: [...editingProduct.specs, { specName: '新規格', price: 0, imageUrl: '', isActive: false }] // Default inactive
         });
     };
 

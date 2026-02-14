@@ -260,6 +260,35 @@ const OrderStatusPage: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Order Details Section */}
+                        <div className="bg-white/40 p-4 rounded-lg mb-6 border border-siam-blue/10">
+                            <h3 className="font-bold text-lg text-siam-dark mb-2 border-b border-siam-blue/20 pb-1">委託明細</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span className="font-bold text-siam-blue">頭飾工藝：</span>
+                                    <span className="text-siam-brown">{order.headpieceCraft}</span>
+                                </div>
+                                <div>
+                                    <span className="font-bold text-siam-blue">總金額：</span>
+                                    <span className="text-siam-brown">NT$ {order.totalPrice}</span>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <span className="font-bold text-siam-blue">加價購項目：</span>
+                                    <span className="text-siam-brown">
+                                        {order.addons && order.addons.length > 0 
+                                            ? order.addons.map(a => a.name).join('、') 
+                                            : '無'}
+                                    </span>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <span className="font-bold text-siam-blue">備註：</span>
+                                    <p className="text-siam-brown whitespace-pre-wrap mt-1 bg-white/50 p-2 rounded">
+                                        {order.remarks || '無'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="grid md:grid-cols-2 gap-8 mt-4">
                             {/* Left Column: Images & Instructions */}
                             <div className="space-y-8">

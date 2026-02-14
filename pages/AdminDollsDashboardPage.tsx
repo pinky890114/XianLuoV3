@@ -18,6 +18,9 @@ const AdminDollsDashboardPage: React.FC = () => {
     const [isShopOpen, setIsShopOpen] = useState(true);
     const [isTogglingShop, setIsTogglingShop] = useState(false);
     
+    // Batch Selection State
+    const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+    
     // Edit Modal state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<DollOrder | null>(null);
@@ -41,12 +44,11 @@ const AdminDollsDashboardPage: React.FC = () => {
     const [newOrderRemarks, setNewOrderRemarks] = useState('');
     const [newOrderAddons, setNewOrderAddons] = useState<Set<string>>(new Set());
 
-    // Delete Confirmation Modal state
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [orderToDelete, setOrderToDelete] = useState<DollOrder | null>(null);
-    const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
+    // Batch Delete Confirmation Modal state (Fail-safe)
+    const [isBatchDeleteModalOpen, setIsBatchDeleteModalOpen] = useState(false);
+    const [batchDeleteInput, setBatchDeleteInput] = useState('');
 
-    // Batch Cleanup Modal state
+    // Batch Cleanup Modal state (Old Orders)
     const [isCleanupModalOpen, setIsCleanupModalOpen] = useState(false);
     const [isNoOldOrdersModalOpen, setIsNoOldOrdersModalOpen] = useState(false);
     const [cleanupCandidates, setCleanupCandidates] = useState<DollOrder[]>([]);
@@ -61,6 +63,8 @@ const AdminDollsDashboardPage: React.FC = () => {
                 .map(doc => ({ id: doc.id, ...doc.data() } as DollOrder))
                 .filter(doc => doc.id !== 'store_config');
             setOrders(fetchedOrders);
+            // Reset selection on refetch
+            setSelectedOrderIds(new Set());
         } catch (error) {
             console.error("Error fetching orders: ", error);
         } finally {
@@ -115,13 +119,30 @@ const AdminDollsDashboardPage: React.FC = () => {
         }
     };
 
+    // --- Batch Selection Logic ---
+    const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            setSelectedOrderIds(new Set(orders.map(o => o.id)));
+        } else {
+            setSelectedOrderIds(new Set());
+        }
+    };
+
+    const toggleSelectOrder = (id: string) => {
+        const newSet = new Set(selectedOrderIds);
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
+        setSelectedOrderIds(newSet);
+    };
+
+    // --- Delete Logic ---
     const deleteOrderImages = async (order: DollOrder) => {
         const deletePromises: Promise<void>[] = [];
         if (order.referenceImageUrls && order.referenceImageUrls.length > 0) {
             order.referenceImageUrls.forEach(url => {
                 try {
                     const imageRef = ref(storage, url);
-                    deletePromises.push(deleteObject(imageRef).catch(err => console.warn(err)));
+                    deletePromises.push(deleteObject(imageRef).catch(err => console.warn("Image delete failed (might already be gone):", err)));
                 } catch (e) { console.warn(e); }
             });
         }
@@ -129,41 +150,54 @@ const AdminDollsDashboardPage: React.FC = () => {
             order.progressImageUrls.forEach(url => {
                 try {
                     const imageRef = ref(storage, url);
-                    deletePromises.push(deleteObject(imageRef).catch(err => console.warn(err)));
+                    deletePromises.push(deleteObject(imageRef).catch(err => console.warn("Image delete failed (might already be gone):", err)));
                 } catch (e) { console.warn(e); }
             });
         }
         await Promise.all(deletePromises);
     };
 
-    const confirmDeleteOrder = (order: DollOrder) => {
-        setOrderToDelete(order);
-        setDeleteConfirmationInput('');
-        setIsDeleteModalOpen(true);
+    const openBatchDeleteModal = () => {
+        if (selectedOrderIds.size === 0) return;
+        setBatchDeleteInput('');
+        setIsBatchDeleteModalOpen(true);
     };
 
-    const executeDeleteOrder = async () => {
-        if (!orderToDelete) return;
-        if (deleteConfirmationInput !== orderToDelete.orderId) {
-            alert("訂單編號輸入不正確，無法刪除。");
+    const executeBatchDelete = async () => {
+        if (batchDeleteInput !== '確認刪除') {
+            alert("輸入驗證碼錯誤");
             return;
         }
+        
         setIsUpdating(true);
         try {
-            await deleteOrderImages(orderToDelete);
-            await deleteDoc(doc(db, 'dollOrders', orderToDelete.id));
-            alert(`訂單 ${orderToDelete.orderId} (含相關圖片) 已刪除`);
+            const batch = writeBatch(db);
+            const imageDeletionPromises: Promise<void>[] = [];
+            const idsToDelete = Array.from(selectedOrderIds);
+            
+            for (const id of idsToDelete) {
+                const order = orders.find(o => o.id === id);
+                if (order) {
+                    imageDeletionPromises.push(deleteOrderImages(order));
+                    batch.delete(doc(db, 'dollOrders', id));
+                }
+            }
+            
+            await Promise.all(imageDeletionPromises);
+            await batch.commit();
+            
+            alert(`成功刪除 ${idsToDelete.length} 筆訂單。`);
             await fetchOrders();
-            setIsDeleteModalOpen(false);
-            setOrderToDelete(null);
+            setIsBatchDeleteModalOpen(false);
         } catch (error: any) {
-            console.error("Error deleting order:", error);
-            alert(`刪除失敗: ${error.message || "未知錯誤"}`);
+            console.error("Batch delete error:", error);
+            alert(`批次刪除失敗: ${error.message}`);
         } finally {
             setIsUpdating(false);
         }
     };
 
+    // --- Cleanup Modal Logic (Old Orders) ---
     const openCleanupModal = () => {
         const now = Date.now();
         const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
@@ -398,13 +432,22 @@ const AdminDollsDashboardPage: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center gap-4 flex-wrap">
+                    {selectedOrderIds.size > 0 && (
+                        <button 
+                            onClick={openBatchDeleteModal}
+                            className="bg-red-600 text-white py-2 px-4 rounded-lg shadow-sm hover:bg-red-700 transition-all flex items-center gap-2 animate-bounce-in"
+                        >
+                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            刪除選取 ({selectedOrderIds.size})
+                        </button>
+                    )}
                      <button 
                         onClick={openCleanupModal}
-                        className="bg-red-100 text-red-700 py-2 px-4 rounded-lg shadow-sm hover:bg-red-200 transition-all flex items-center gap-2 border border-red-300"
+                        className="bg-white text-siam-brown py-2 px-4 rounded-lg shadow-sm hover:bg-gray-50 transition-all flex items-center gap-2 border border-siam-brown/30"
                         title="清除所有已送達且超過60天的訂單"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        清除舊訂單
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        清除舊單
                     </button>
                     <button 
                         onClick={toggleShopStatus} 
@@ -442,6 +485,14 @@ const AdminDollsDashboardPage: React.FC = () => {
                     <table className="min-w-full divide-y divide-siam-blue">
                         <thead className="bg-siam-blue/10">
                             <tr>
+                                <th className="px-4 py-3 w-10">
+                                    <input 
+                                        type="checkbox" 
+                                        className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer"
+                                        checked={selectedOrderIds.size === orders.length && orders.length > 0}
+                                        onChange={toggleSelectAll}
+                                    />
+                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-siam-dark uppercase tracking-wider">訂單編號</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-siam-dark uppercase tracking-wider">暱稱</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-siam-dark uppercase tracking-wider">標題</th>
@@ -452,7 +503,15 @@ const AdminDollsDashboardPage: React.FC = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {orders.map(order => (
-                                <tr key={order.id}>
+                                <tr key={order.id} className={selectedOrderIds.has(order.id) ? 'bg-blue-50' : ''}>
+                                    <td className="px-4 py-4 w-10">
+                                        <input 
+                                            type="checkbox" 
+                                            className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer"
+                                            checked={selectedOrderIds.has(order.id)}
+                                            onChange={() => toggleSelectOrder(order.id)}
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">{order.orderId}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-siam-dark">{order.nickname}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">{order.title}</td>
@@ -463,16 +522,7 @@ const AdminDollsDashboardPage: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <div className="flex items-center space-x-3">
-                                            <button onClick={() => openEditModal(order)} className="text-siam-blue hover:text-siam-dark font-bold">查看/編輯</button>
-                                            <button 
-                                                onClick={() => confirmDeleteOrder(order)} 
-                                                className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"
-                                                title="刪除訂單"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                            </button>
-                                        </div>
+                                        <button onClick={() => openEditModal(order)} className="text-siam-blue hover:text-siam-dark font-bold">查看/編輯</button>
                                     </td>
                                 </tr>
                             ))}
@@ -482,36 +532,38 @@ const AdminDollsDashboardPage: React.FC = () => {
                 )}
             </div>
             
-            {/* Delete Confirmation Modal */}
-            <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="⚠️ 刪除訂單確認">
-                {orderToDelete && (
-                    <div className="space-y-4">
-                        <div className="bg-red-50 border border-red-200 rounded p-4 text-red-700">
-                            <p className="font-bold">此動作無法復原！</p>
-                            <p>您確定要永久刪除訂單 <span className="font-mono bg-white px-1 rounded">{orderToDelete.orderId}</span> ({orderToDelete.nickname}) 嗎？</p>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">請輸入訂單編號以確認刪除：</label>
-                            <input 
-                                type="text" 
-                                value={deleteConfirmationInput}
-                                onChange={(e) => setDeleteConfirmationInput(e.target.value)}
-                                placeholder={orderToDelete.orderId}
-                                className="w-full p-2 border border-red-300 rounded focus:ring-2 focus:ring-red-500 outline-none"
-                            />
-                        </div>
-                        <div className="flex justify-end space-x-3 pt-2">
-                             <button onClick={() => setIsDeleteModalOpen(false)} className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded">取消</button>
-                             <button 
-                                onClick={executeDeleteOrder}
-                                disabled={deleteConfirmationInput !== orderToDelete.orderId || isUpdating}
-                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
-                             >
-                                {isUpdating ? <LoadingSpinner /> : '確認刪除'}
-                             </button>
-                        </div>
+            {/* Batch Delete Confirmation Modal */}
+            <Modal isOpen={isBatchDeleteModalOpen} onClose={() => setIsBatchDeleteModalOpen(false)} title="⚠️ 批次刪除確認">
+                <div className="space-y-4">
+                    <div className="bg-red-50 border border-red-200 rounded p-4 text-red-700">
+                        <p className="font-bold text-lg mb-2">嚴重警告：此動作無法復原！</p>
+                        <p>您即將永久刪除 <span className="font-bold text-xl">{selectedOrderIds.size}</span> 筆訂單。</p>
+                        <ul className="list-disc list-inside mt-2 text-sm">
+                            <li>所有選取的訂單資料將被永久移除。</li>
+                            <li>所有相關的參考圖、進度圖將從資料庫中刪除。</li>
+                        </ul>
                     </div>
-                )}
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">請輸入「確認刪除」以執行此操作：</label>
+                        <input 
+                            type="text" 
+                            value={batchDeleteInput}
+                            onChange={(e) => setBatchDeleteInput(e.target.value)}
+                            placeholder="確認刪除"
+                            className="w-full p-2 border border-red-300 rounded focus:ring-2 focus:ring-red-500 outline-none placeholder:text-gray-300"
+                        />
+                    </div>
+                    <div className="flex justify-end space-x-3 pt-2">
+                            <button onClick={() => setIsBatchDeleteModalOpen(false)} className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded">取消</button>
+                            <button 
+                            onClick={executeBatchDelete}
+                            disabled={batchDeleteInput !== '確認刪除' || isUpdating}
+                            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+                            >
+                            {isUpdating ? <LoadingSpinner /> : '確認刪除'}
+                            </button>
+                    </div>
+                </div>
             </Modal>
 
             {/* No Old Orders Modal */}
@@ -718,7 +770,7 @@ const AdminDollsDashboardPage: React.FC = () => {
 
             {/* New Order Modal */}
             <Modal isOpen={isNewOrderModalOpen} onClose={closeNewOrderModal} title="新增訂單">
-                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
+                <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-siam-dark">暱稱*</label>
                         <input type="text" value={newOrderNickname} onChange={(e) => setNewOrderNickname(e.target.value)} required className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md focus:ring-siam-dark focus:border-siam-dark"/>

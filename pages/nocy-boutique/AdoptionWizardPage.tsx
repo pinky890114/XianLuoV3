@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { addDoc, collection, serverTimestamp, Timestamp, doc, getDoc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, Timestamp, doc, onSnapshot } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import { db } from '../../firebaseConfig';
 import { HeadpieceCraft, OrderStatus, DollOrder } from '../../types';
@@ -112,27 +112,23 @@ const AdoptionWizardPage: React.FC = () => {
     const [referenceImages, setReferenceImages] = useState<FileList | null>(null);
 
     useEffect(() => {
-        const fetchShopStatus = async () => {
-            setIsCheckingStatus(true);
-            try {
-                const configDocRef = doc(db, 'dollOrders', 'store_config');
-                const docSnap = await getDoc(configDocRef);
-                // The shop is closed ONLY if the doc exists and the flag is explicitly false.
-                // Otherwise, it's open (default state or error state).
-                if (docSnap.exists() && docSnap.data().isShopOpen === false) {
-                    setIsShopOpen(false);
-                } else {
-                    setIsShopOpen(true);
-                }
-            } catch (error) {
-                console.error("Error fetching shop status, defaulting to open:", error);
-                setIsShopOpen(true); // Fail open to not interrupt service
-            } finally {
-                setIsCheckingStatus(false);
+        const configDocRef = doc(db, 'dollOrders', 'store_config');
+        
+        // Use onSnapshot for real-time updates
+        const unsubscribe = onSnapshot(configDocRef, (docSnap) => {
+            if (docSnap.exists() && docSnap.data().isShopOpen === false) {
+                setIsShopOpen(false);
+            } else {
+                setIsShopOpen(true);
             }
-        };
+            setIsCheckingStatus(false);
+        }, (error) => {
+            console.error("Error listening to shop status:", error);
+            setIsShopOpen(true); // Fail open to not interrupt service
+            setIsCheckingStatus(false);
+        });
 
-        fetchShopStatus();
+        return () => unsubscribe();
     }, []);
 
     // Calculate total price based on base price and selected addons
@@ -228,8 +224,7 @@ const AdoptionWizardPage: React.FC = () => {
         return (
             <div className="text-center py-20 px-6 bg-white/50 rounded-lg shadow-md min-h-[40vh] flex flex-col justify-center items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-siam-blue mb-6"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
-                <h2 className="text-4xl font-bold text-siam-dark mb-4">餅舖歇業中</h2>
-                <p className="text-xl text-siam-brown mb-10">去其他地方逛逛</p>
+                <h2 className="text-4xl font-bold text-siam-dark mb-8">餅舖歇業中，去其他地方逛逛</h2>
                 <Link 
                     to="/siam-stall" 
                     className="inline-block bg-siam-brown text-siam-cream py-4 px-10 rounded-lg shadow-lg hover:bg-siam-dark transition-all transform hover:-translate-y-1 font-bold text-lg"

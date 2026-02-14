@@ -269,7 +269,7 @@ const AdoptionWizardPage: React.FC = () => {
 
                     <div className="bg-siam-blue/5 p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-6">
                         <div className="text-center md:text-left">
-                            <span className="text-xl font-bold text-siam-dark">訂作價格請以最後實際報價為準。</span>
+                            <span className="text-xl font-bold text-siam-dark">訂做價格請以最後實際報價為準。</span>
                         </div>
                         <div className="flex flex-row gap-4 w-full md:w-auto">
                             <button type="button" onClick={() => setStep(2)} className="flex-1 bg-gray-200 text-siam-brown py-3 px-8 rounded-lg font-bold hover:bg-gray-300 whitespace-nowrap">上一步</button>

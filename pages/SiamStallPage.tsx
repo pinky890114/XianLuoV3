@@ -131,33 +131,29 @@ const SiamStallPage: React.FC = () => {
             const orderId = `STALL-${Date.now().toString().slice(-6)}`;
             
             // Generate a concise title for the order list
-            // If multiple items, simpler title + detailed remarks/content
             const productTitle = cartDetails.length === 1 
                 ? cartDetails[0] 
                 : `混合委託 (共${totalItems}件)`;
 
-            // Combine details into remarks or store as formatted string
             const fullContentString = cartDetails.join('\n');
             const finalRemarks = remarks ? `${remarks}\n\n=== 委託內容 ===\n${fullContentString}` : `=== 委託內容 ===\n${fullContentString}`;
             
-            const now = Timestamp.now(); // Capture client time for sync
+            const now = Timestamp.now(); 
 
             const orderData: Omit<BadgeOrder, 'id'> = {
                 orderId,
                 nickname,
-                productTitle: fullContentString, // Store full details in title field for Sheet visibility, or manage otherwise
+                productTitle: fullContentString, 
                 price: totalPrice,
                 status: OrderStatus.PENDING,
                 messages: [],
                 progressImageUrls: [],
-                remarks: remarks || '無', // Keep user remarks separate in DB if needed, but here we merged for simplicity in some views
+                remarks: remarks || '無', 
                 createdAt: serverTimestamp() as Timestamp
             };
 
             await addDoc(collection(db, 'badgeOrders'), orderData);
             
-            // Sync to Google Sheets
-            // Use client timestamp because serverTimestamp() is a sentinel and cannot be converted to Date immediately
             await syncOrderToGoogleSheet({ 
                 ...orderData, 
                 createdAt: now 
@@ -186,7 +182,7 @@ const SiamStallPage: React.FC = () => {
                 <div className="space-y-8 animate-fadeIn pb-32">
                     <header>
                         <h1 className="text-4xl font-bold text-siam-dark mb-2">暹羅地攤</h1>
-                        <p className="text-lg text-siam-brown">劍三亮晶晶周邊與軟綿綿周邊</p>
+                        <p className="text-lg text-siam-brown">亮晶晶與軟綿綿周邊</p>
                     </header>
 
                     <div className="bg-white/60 p-6 rounded-xl shadow-lg border border-siam-blue/10 space-y-8">
@@ -231,7 +227,7 @@ const SiamStallPage: React.FC = () => {
                             </section>
                         )}
                         
-                        {/* 動態說明區塊 (新增) */}
+                        {/* 動態說明區塊 */}
                         {viewSeriesId && viewingSeries && (viewingSeries.basicDescription || viewingSeries.priceDescription) && (
                             <section className="animate-slideUp bg-siam-cream/30 p-4 rounded-lg border border-siam-blue/20 space-y-4">
                                 {viewingSeries.basicDescription && (
@@ -266,7 +262,6 @@ const SiamStallPage: React.FC = () => {
                                 {viewingSeries.specs.some(s => s.isActive) ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {viewingSeries.specs.map((spec, idx) => {
-                                            // Only render active specs, but we need the index to be correct for the full array
                                             if (!spec.isActive) return null;
                                             
                                             const qty = getQuantity(viewingSeries.id, idx);
@@ -283,7 +278,6 @@ const SiamStallPage: React.FC = () => {
                                                         </div>
                                                     </div>
                                                     
-                                                    {/* Quantity Controls */}
                                                     <div className="flex items-center gap-2 flex-shrink-0">
                                                         <button 
                                                             onClick={() => updateCart(viewingSeries.id, idx, -1)}
@@ -313,10 +307,8 @@ const SiamStallPage: React.FC = () => {
                         )}
                     </div>
 
-                    {/* 懸浮購物車/結帳列 (當有商品時顯示) */}
                     {totalItems > 0 && (
                         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-50 transition-all duration-300">
-                             {/* Expanded List Details */}
                              {isCartExpanded && (
                                 <div className="max-h-60 overflow-y-auto bg-gray-50 border-b border-gray-100 p-4 animate-slideUp">
                                     <div className="container mx-auto max-w-4xl">

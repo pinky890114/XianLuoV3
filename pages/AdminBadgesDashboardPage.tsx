@@ -489,6 +489,8 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                                     <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
                                                         <div className="flex items-center">
                                                             <div className={`w-2 h-2 rounded-full mr-2 ${spec.isActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                            {/* Display Style if exists */}
+                                                            {spec.style && <span className="bg-siam-blue/10 text-siam-blue px-1.5 rounded mr-1 text-xs">{spec.style}</span>}
                                                             <span className={spec.isActive ? '' : 'text-gray-400 line-through'}>{spec.specName}</span>
                                                             <span className="ml-2 text-siam-blue font-bold">${spec.price}</span>
                                                         </div>
@@ -651,10 +653,19 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                             {spec.imageUrl ? <img src={spec.imageUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300">無圖</div>}
                                             <label className="absolute inset-0 bg-black/50 text-white flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 cursor-pointer transition-all">更換圖片<input type="file" hidden accept="image/*" onChange={e => e.target.files && handleImageChange(idx, e.target.files[0])} /></label>
                                         </div>
-                                        <div className="flex-grow grid grid-cols-2 gap-2">
-                                            <input type="text" placeholder="規格名" value={spec.specName} onChange={e => { const newSpecs = [...editingProduct.specs]; newSpecs[idx].specName = e.target.value; setEditingProduct({...editingProduct, specs: newSpecs}); }} className="p-1 border rounded text-sm" />
-                                            <input type="number" placeholder="價格" value={spec.price} onChange={e => { const newSpecs = [...editingProduct.specs]; newSpecs[idx].price = Number(e.target.value); setEditingProduct({...editingProduct, specs: newSpecs}); }} className="p-1 border rounded text-sm" />
-                                            <div className="col-span-2 flex justify-between items-center pt-2"><label className="flex items-center text-xs"><input type="checkbox" checked={spec.isActive} onChange={() => { const newSpecs = [...editingProduct.specs]; newSpecs[idx].isActive = !newSpecs[idx].isActive; setEditingProduct({...editingProduct, specs: newSpecs}); }} className="mr-1" /> 開單中</label><button onClick={() => handleRemoveSpecFromEditing(idx)} className="text-red-500 text-xs">刪除</button></div>
+                                        <div className="flex-grow grid grid-cols-3 gap-2">
+                                            {/* Style Input Added */}
+                                            <div className="col-span-3 md:col-span-1">
+                                                 <input type="text" placeholder="分組 (如:長歌)" value={spec.style || ''} onChange={e => { const newSpecs = [...editingProduct.specs]; newSpecs[idx].style = e.target.value; setEditingProduct({...editingProduct, specs: newSpecs}); }} className="w-full p-1 border rounded text-sm bg-blue-50 focus:bg-white" />
+                                            </div>
+                                            <div className="col-span-3 md:col-span-1">
+                                                <input type="text" placeholder="規格名" value={spec.specName} onChange={e => { const newSpecs = [...editingProduct.specs]; newSpecs[idx].specName = e.target.value; setEditingProduct({...editingProduct, specs: newSpecs}); }} className="w-full p-1 border rounded text-sm" />
+                                            </div>
+                                            <div className="col-span-3 md:col-span-1">
+                                                <input type="number" placeholder="價格" value={spec.price} onChange={e => { const newSpecs = [...editingProduct.specs]; newSpecs[idx].price = Number(e.target.value); setEditingProduct({...editingProduct, specs: newSpecs}); }} className="w-full p-1 border rounded text-sm" />
+                                            </div>
+                                            
+                                            <div className="col-span-3 flex justify-between items-center pt-2"><label className="flex items-center text-xs"><input type="checkbox" checked={spec.isActive} onChange={() => { const newSpecs = [...editingProduct.specs]; newSpecs[idx].isActive = !newSpecs[idx].isActive; setEditingProduct({...editingProduct, specs: newSpecs}); }} className="mr-1" /> 開單中</label><button onClick={() => handleRemoveSpecFromEditing(idx)} className="text-red-500 text-xs">刪除</button></div>
                                         </div>
                                     </div>
                                 ))}

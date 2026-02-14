@@ -112,6 +112,7 @@ export interface DollOrder {
 // --- 暹羅地攤相關型別 ---
 
 export interface ProductSpec {
+    style?: string; // e.g., '長歌', '藏劍' - 用於前台分組顯示
     specName: string;
     price: number;
     imageUrl: string;

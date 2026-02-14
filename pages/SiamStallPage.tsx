@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import { Product, OrderStatus, BadgeOrder } from '../types';
+import { Product, OrderStatus, BadgeOrder, ProductSpec } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { syncOrderToGoogleSheet } from '../services/googleSheetsService';
 import { sendBadgeOrderNotification } from '../services/discordService';
@@ -55,6 +54,32 @@ const SiamStallPage: React.FC = () => {
         return products.find(p => p.id === viewSeriesId);
     }, [products, viewSeriesId]);
 
+    // Group specs by style for display
+    const groupedSpecs = useMemo<{ groups: Record<string, { spec: ProductSpec, originalIndex: number }[]>, other: { spec: ProductSpec, originalIndex: number }[] } | null>(() => {
+        if (!viewingSeries) return null;
+        
+        // Check if any spec has a style
+        const hasStyles = viewingSeries.specs.some(s => s.style && s.style.trim() !== '');
+        
+        if (!hasStyles) return null;
+
+        const groups: Record<string, { spec: ProductSpec, originalIndex: number }[]> = {};
+        const other: { spec: ProductSpec, originalIndex: number }[] = [];
+
+        viewingSeries.specs.forEach((spec, idx) => {
+            if (!spec.isActive) return; // Skip inactive here or handle in render
+            
+            if (spec.style && spec.style.trim() !== '') {
+                if (!groups[spec.style]) groups[spec.style] = [];
+                groups[spec.style].push({ spec, originalIndex: idx });
+            } else {
+                other.push({ spec, originalIndex: idx });
+            }
+        });
+
+        return { groups, other };
+    }, [viewingSeries]);
+
     // Calculate Cart Totals
     const { totalPrice, totalItems, cartDetails, summaryString } = useMemo(() => {
         let price = 0;
@@ -72,7 +97,9 @@ const SiamStallPage: React.FC = () => {
                 if (product && spec) {
                     price += spec.price * qty;
                     items += qty;
-                    details.push(`[${product.categoryId}] ${product.seriesName} - ${spec.specName} x${qty}`);
+                    // Format: [Category] Series - (Style) Spec xQty
+                    const stylePart = spec.style ? `(${spec.style}) ` : '';
+                    details.push(`[${product.categoryId}] ${product.seriesName} - ${stylePart}${spec.specName} x${qty}`);
                 }
             }
         });
@@ -182,6 +209,39 @@ const SiamStallPage: React.FC = () => {
 
     if (isLoading) return <div className="flex justify-center p-20"><LoadingSpinner /></div>;
 
+    // Helper component to render a spec card
+    const SpecCard: React.FC<{ spec: ProductSpec, idx: number, productId: string }> = ({ spec, idx, productId }) => {
+        const qty = getQuantity(productId, idx);
+        return (
+            <div className={`flex items-center justify-between p-3 rounded-lg border transition-all ${qty > 0 ? 'bg-siam-cream border-siam-brown ring-1 ring-siam-brown/20' : 'bg-white border-gray-200'}`}>
+                <div className="flex items-center overflow-hidden">
+                    <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-14 h-14 rounded object-cover mr-3 flex-shrink-0" />
+                    <div className="text-left min-w-0">
+                        <p className="font-bold text-siam-dark truncate pr-2">{spec.specName}</p>
+                        <p className="text-sm text-siam-blue">${spec.price}</p>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <button 
+                        onClick={() => updateCart(productId, idx, -1)}
+                        className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold"
+                    >-</button>
+                    <input 
+                        type="number" 
+                        value={qty}
+                        onChange={(e) => handleInputChange(productId, idx, e.target.value)}
+                        className="w-12 text-center p-1 border rounded bg-white font-bold text-siam-dark focus:ring-2 focus:ring-siam-blue outline-none"
+                    />
+                    <button 
+                        onClick={() => updateCart(productId, idx, 1)}
+                        className="w-8 h-8 rounded-full bg-siam-blue text-white hover:bg-siam-dark flex items-center justify-center font-bold"
+                    >+</button>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-4xl min-h-screen">
             <Link to="/" className="text-siam-blue hover:text-siam-dark transition-colors mb-4 inline-flex items-center space-x-2">
@@ -271,44 +331,40 @@ const SiamStallPage: React.FC = () => {
                                 </h2>
                                 
                                 {viewingSeries.specs.some(s => s.isActive) ? (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {viewingSeries.specs.map((spec, idx) => {
-                                            if (!spec.isActive) return null;
-                                            
-                                            const qty = getQuantity(viewingSeries.id, idx);
-                                            return (
-                                                <div
-                                                    key={idx}
-                                                    className={`flex items-center justify-between p-3 rounded-lg border transition-all ${qty > 0 ? 'bg-siam-cream border-siam-brown ring-1 ring-siam-brown/20' : 'bg-white border-gray-200'}`}
-                                                >
-                                                    <div className="flex items-center overflow-hidden">
-                                                        <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-14 h-14 rounded object-cover mr-3 flex-shrink-0" />
-                                                        <div className="text-left min-w-0">
-                                                            <p className="font-bold text-siam-dark truncate pr-2">{spec.specName}</p>
-                                                            <p className="text-sm text-siam-blue">${spec.price}</p>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                                        <button 
-                                                            onClick={() => updateCart(viewingSeries.id, idx, -1)}
-                                                            className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold"
-                                                        >-</button>
-                                                        <input 
-                                                            type="number" 
-                                                            value={qty}
-                                                            onChange={(e) => handleInputChange(viewingSeries.id, idx, e.target.value)}
-                                                            className="w-12 text-center p-1 border rounded bg-white font-bold text-siam-dark focus:ring-2 focus:ring-siam-blue outline-none"
-                                                        />
-                                                        <button 
-                                                            onClick={() => updateCart(viewingSeries.id, idx, 1)}
-                                                            className="w-8 h-8 rounded-full bg-siam-blue text-white hover:bg-siam-dark flex items-center justify-center font-bold"
-                                                        >+</button>
+                                    groupedSpecs ? (
+                                        // Render grouped specs
+                                        <div className="space-y-6">
+                                            {Object.entries(groupedSpecs.groups).map(([styleName, items]) => (
+                                                <div key={styleName} className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                                    <h3 className="font-bold text-lg text-siam-blue mb-3 border-b border-siam-blue/20 pb-1">{styleName}</h3>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        {items.map((item, i) => (
+                                                            <SpecCard key={i} spec={item.spec} idx={item.originalIndex} productId={viewingSeries.id} />
+                                                        ))}
                                                     </div>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
+                                            ))}
+                                            
+                                            {groupedSpecs.other.length > 0 && (
+                                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                                    <h3 className="font-bold text-lg text-gray-500 mb-3 border-b border-gray-200 pb-1">其他</h3>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        {groupedSpecs.other.map((item, i) => (
+                                                            <SpecCard key={i} spec={item.spec} idx={item.originalIndex} productId={viewingSeries.id} />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        // Render flat specs (classic view)
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {viewingSeries.specs.map((spec, idx) => {
+                                                if (!spec.isActive) return null;
+                                                return <SpecCard key={idx} spec={spec} idx={idx} productId={viewingSeries.id} />;
+                                            })}
+                                        </div>
+                                    )
                                 ) : (
                                     <div className="col-span-full text-center p-8 bg-gray-100 rounded-lg text-gray-500 font-bold text-lg">
                                         預購已終止，下次手快

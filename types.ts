@@ -5,6 +5,7 @@ export enum HeadpieceCraft {
     INTEGRATED = '跟頭髮一體',
     DETACHABLE = '可拆插入式',
     CLIPON = '通用夾式',
+    NONE = '沒有頭飾',
 }
 
 export interface Addon {

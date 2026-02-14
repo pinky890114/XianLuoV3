@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -9,17 +10,58 @@ import { sendBadgeOrderNotification } from '../services/discordService';
 
 const CATEGORIES = ['快閃櫥窗', '金屬徽章', '棉花製品'];
 
+// Extract SpecCard to prevent re-rendering issues and prop drilling
+interface SpecCardProps {
+    spec: ProductSpec;
+    idx: number; // This is the original index in the specs array
+    productId: string;
+    qty: number;
+    onUpdate: (productId: string, idx: number, delta: number) => void;
+    onInputChange: (productId: string, idx: number, value: string) => void;
+}
+
+const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate, onInputChange }) => {
+    return (
+        <div className={`flex items-center justify-between p-3 rounded-lg border transition-all ${qty > 0 ? 'bg-siam-cream border-siam-brown ring-1 ring-siam-brown/20' : 'bg-white border-gray-200'}`}>
+            <div className="flex items-center overflow-hidden">
+                <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-14 h-14 rounded object-cover mr-3 flex-shrink-0" />
+                <div className="text-left min-w-0">
+                    <p className="font-bold text-siam-dark truncate pr-2">{spec.specName}</p>
+                    <p className="text-sm text-siam-blue">${spec.price}</p>
+                </div>
+            </div>
+            
+            <div className="flex items-center gap-2 flex-shrink-0">
+                <button 
+                    onClick={() => onUpdate(productId, idx, -1)}
+                    className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold"
+                >-</button>
+                <input 
+                    type="number" 
+                    value={qty}
+                    onChange={(e) => onInputChange(productId, idx, e.target.value)}
+                    className="w-12 text-center p-1 border rounded bg-white font-bold text-siam-dark focus:ring-2 focus:ring-siam-blue outline-none"
+                />
+                <button 
+                    onClick={() => onUpdate(productId, idx, 1)}
+                    className="w-8 h-8 rounded-full bg-siam-blue text-white hover:bg-siam-dark flex items-center justify-center font-bold"
+                >+</button>
+            </div>
+        </div>
+    );
+};
+
 const SiamStallPage: React.FC = () => {
     const navigate = useNavigate();
     const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [step, setStep] = useState(1); // 1: 購物車選購, 2: 填寫資料, 3: 成功
 
-    // Selection View States (僅控制當前顯示的商品列表，不影響購物車)
+    // Selection View States
     const [viewCat, setViewCat] = useState<string>('');
     const [viewSeriesId, setViewSeriesId] = useState<string>('');
     
-    // Global Cart State: Key = `${productId}_${specIndex}`, Value = quantity
+    // Global Cart State
     const [cart, setCart] = useState<Record<string, number>>({});
     const [isCartExpanded, setIsCartExpanded] = useState(false);
 
@@ -34,7 +76,15 @@ const SiamStallPage: React.FC = () => {
             try {
                 const q = query(collection(db, 'products'));
                 const snap = await getDocs(q);
-                const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+                // Ensure data structure is robust
+                const list = snap.docs.map(doc => {
+                    const data = doc.data();
+                    return { 
+                        id: doc.id, 
+                        ...data,
+                        specs: Array.isArray(data.specs) ? data.specs : [] 
+                    } as Product;
+                });
                 setProducts(list);
             } catch (err) {
                 console.error("Error fetching products:", err);
@@ -56,7 +106,7 @@ const SiamStallPage: React.FC = () => {
 
     // Group specs by style for display
     const groupedSpecs = useMemo<{ groups: Record<string, { spec: ProductSpec, originalIndex: number }[]>, other: { spec: ProductSpec, originalIndex: number }[] } | null>(() => {
-        if (!viewingSeries) return null;
+        if (!viewingSeries || !viewingSeries.specs) return null;
         
         // Check if any spec has a style
         const hasStyles = viewingSeries.specs.some(s => s.style && s.style.trim() !== '');
@@ -67,7 +117,7 @@ const SiamStallPage: React.FC = () => {
         const other: { spec: ProductSpec, originalIndex: number }[] = [];
 
         viewingSeries.specs.forEach((spec, idx) => {
-            if (!spec.isActive) return; // Skip inactive here or handle in render
+            if (!spec.isActive) return;
             
             if (spec.style && spec.style.trim() !== '') {
                 if (!groups[spec.style]) groups[spec.style] = [];
@@ -81,7 +131,8 @@ const SiamStallPage: React.FC = () => {
     }, [viewingSeries]);
 
     // Calculate Cart Totals
-    const { totalPrice, totalItems, cartDetails, summaryString } = useMemo(() => {
+    // FIX: Removing explicit generic from useMemo to ensure TypeScript correctly infers the returned object properties
+    const { totalPrice, totalItems, cartDetails } = useMemo(() => {
         let price = 0;
         let items = 0;
         const details: string[] = [];
@@ -92,12 +143,11 @@ const SiamStallPage: React.FC = () => {
                 const [pId, specIdxStr] = key.split('_');
                 const specIdx = parseInt(specIdxStr);
                 const product = products.find(p => p.id === pId);
-                const spec = product?.specs[specIdx];
+                const spec = product?.specs?.[specIdx]; // Add safe access
 
                 if (product && spec) {
                     price += spec.price * qty;
                     items += qty;
-                    // Format: [Category] Series - (Style) Spec xQty
                     const stylePart = spec.style ? `(${spec.style}) ` : '';
                     details.push(`[${product.categoryId}] ${product.seriesName} - ${stylePart}${spec.specName} x${qty}`);
                 }
@@ -108,7 +158,6 @@ const SiamStallPage: React.FC = () => {
             totalPrice: price, 
             totalItems: items,
             cartDetails: details,
-            summaryString: details.join('、\n')
         };
     }, [cart, products]);
 
@@ -158,7 +207,6 @@ const SiamStallPage: React.FC = () => {
         try {
             const orderId = `STALL-${Date.now().toString().slice(-6)}`;
             
-            // Generate a concise title for the order list
             const productTitle = cartDetails.length === 1 
                 ? cartDetails[0] 
                 : `混合委託 (共${totalItems}件)`;
@@ -173,7 +221,6 @@ const SiamStallPage: React.FC = () => {
                 nickname,
                 productTitle: fullContentString, 
                 price: totalPrice,
-                // Change initial status to QUANTITY_SURVEY
                 status: OrderStatus.QUANTITY_SURVEY,
                 messages: [],
                 progressImageUrls: [],
@@ -188,7 +235,6 @@ const SiamStallPage: React.FC = () => {
                 createdAt: now 
             } as any, 'badge');
 
-            // Send notification to Discord
             await sendBadgeOrderNotification({
                 orderId,
                 nickname,
@@ -209,41 +255,20 @@ const SiamStallPage: React.FC = () => {
 
     if (isLoading) return <div className="flex justify-center p-20"><LoadingSpinner /></div>;
 
-    // Helper component to render a spec card
-    const SpecCard: React.FC<{ spec: ProductSpec, idx: number, productId: string }> = ({ spec, idx, productId }) => {
-        const qty = getQuantity(productId, idx);
-        return (
-            <div className={`flex items-center justify-between p-3 rounded-lg border transition-all ${qty > 0 ? 'bg-siam-cream border-siam-brown ring-1 ring-siam-brown/20' : 'bg-white border-gray-200'}`}>
-                <div className="flex items-center overflow-hidden">
-                    <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-14 h-14 rounded object-cover mr-3 flex-shrink-0" />
-                    <div className="text-left min-w-0">
-                        <p className="font-bold text-siam-dark truncate pr-2">{spec.specName}</p>
-                        <p className="text-sm text-siam-blue">${spec.price}</p>
-                    </div>
-                </div>
-                
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <button 
-                        onClick={() => updateCart(productId, idx, -1)}
-                        className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold"
-                    >-</button>
-                    <input 
-                        type="number" 
-                        value={qty}
-                        onChange={(e) => handleInputChange(productId, idx, e.target.value)}
-                        className="w-12 text-center p-1 border rounded bg-white font-bold text-siam-dark focus:ring-2 focus:ring-siam-blue outline-none"
-                    />
-                    <button 
-                        onClick={() => updateCart(productId, idx, 1)}
-                        className="w-8 h-8 rounded-full bg-siam-blue text-white hover:bg-siam-dark flex items-center justify-center font-bold"
-                    >+</button>
-                </div>
-            </div>
-        );
-    };
-
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-4xl min-h-screen">
+             <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(15px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .animate-fadeIn {
+                    animation: fadeIn 0.9s ease-out forwards;
+                }
+                .animate-slideUp {
+                    animation: fadeIn 0.5s ease-out forwards;
+                }
+            `}</style>
             <Link to="/" className="text-siam-blue hover:text-siam-dark transition-colors mb-4 inline-flex items-center space-x-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                 <span>返回首頁</span>
@@ -323,12 +348,17 @@ const SiamStallPage: React.FC = () => {
                         )}
 
                         {/* 3. 規格選取與數量 */}
-                        {viewSeriesId && viewingSeries && (
+                        {viewSeriesId && viewingSeries && viewingSeries.specs && (
                             <section className="animate-slideUp">
                                 <h2 className="text-xl font-bold text-siam-dark mb-4 flex items-center gap-2">
                                     <span className="w-6 h-6 bg-siam-blue text-white rounded-full flex items-center justify-center text-xs">3</span>
                                     選擇規格與數量
                                 </h2>
+
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700 font-bold leading-relaxed">
+                                    下面的價格都是台幣，以貼文時的匯率轉換計價方便參考，實際價格以收款時的匯率為準，
+                                    以上價格皆不包含運費、集運費和賣貨便運費 。
+                                </div>
                                 
                                 {viewingSeries.specs.some(s => s.isActive) ? (
                                     groupedSpecs ? (
@@ -339,7 +369,15 @@ const SiamStallPage: React.FC = () => {
                                                     <h3 className="font-bold text-lg text-siam-blue mb-3 border-b border-siam-blue/20 pb-1">{styleName}</h3>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                         {items.map((item, i) => (
-                                                            <SpecCard key={i} spec={item.spec} idx={item.originalIndex} productId={viewingSeries.id} />
+                                                            <SpecCard 
+                                                                key={`${viewingSeries.id}-${item.originalIndex}`}
+                                                                spec={item.spec} 
+                                                                idx={item.originalIndex} 
+                                                                productId={viewingSeries.id}
+                                                                qty={getQuantity(viewingSeries.id, item.originalIndex)}
+                                                                onUpdate={updateCart}
+                                                                onInputChange={handleInputChange}
+                                                            />
                                                         ))}
                                                     </div>
                                                 </div>
@@ -350,7 +388,15 @@ const SiamStallPage: React.FC = () => {
                                                     <h3 className="font-bold text-lg text-gray-500 mb-3 border-b border-gray-200 pb-1">其他</h3>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                         {groupedSpecs.other.map((item, i) => (
-                                                            <SpecCard key={i} spec={item.spec} idx={item.originalIndex} productId={viewingSeries.id} />
+                                                            <SpecCard 
+                                                                key={`${viewingSeries.id}-${item.originalIndex}`}
+                                                                spec={item.spec} 
+                                                                idx={item.originalIndex} 
+                                                                productId={viewingSeries.id}
+                                                                qty={getQuantity(viewingSeries.id, item.originalIndex)}
+                                                                onUpdate={updateCart}
+                                                                onInputChange={handleInputChange}
+                                                            />
                                                         ))}
                                                     </div>
                                                 </div>
@@ -361,7 +407,17 @@ const SiamStallPage: React.FC = () => {
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             {viewingSeries.specs.map((spec, idx) => {
                                                 if (!spec.isActive) return null;
-                                                return <SpecCard key={idx} spec={spec} idx={idx} productId={viewingSeries.id} />;
+                                                return (
+                                                    <SpecCard 
+                                                        key={`${viewingSeries.id}-${idx}`}
+                                                        spec={spec} 
+                                                        idx={idx} 
+                                                        productId={viewingSeries.id}
+                                                        qty={getQuantity(viewingSeries.id, idx)}
+                                                        onUpdate={updateCart}
+                                                        onInputChange={handleInputChange}
+                                                    />
+                                                );
                                             })}
                                         </div>
                                     )
@@ -408,7 +464,10 @@ const SiamStallPage: React.FC = () => {
                                                 {isCartExpanded ? '隱藏明細 ▼' : '查看明細 ▲'}
                                             </span>
                                         </div>
-                                        <p className="text-2xl font-bold text-siam-dark">總計: ${totalPrice}</p>
+                                        <div className="mt-1">
+                                            <p className="text-xs text-siam-brown font-bold opacity-80">目前預估金額（以收款時報價匯率為準）</p>
+                                            <p className="text-2xl font-bold text-siam-dark">${totalPrice}</p>
+                                        </div>
                                     </div>
                                     <button 
                                         onClick={() => setStep(2)}

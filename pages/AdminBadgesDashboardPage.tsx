@@ -110,6 +110,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
                 batch.set(newDocRef, {
                     categoryId: item.cat,
                     seriesName: item.name,
+                    status: 'active',
                     specs: [{ specName: '預設規格', price: 0, imageUrl: '', isActive: true }]
                 });
                 hasUpdates = true;
@@ -181,6 +182,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
             await addDoc(collection(db, 'products'), {
                 categoryId: newSeriesCategory,
                 seriesName: newSeriesName.trim(),
+                status: 'active', // Default status
                 specs: [{ specName: '預設規格', price: 0, imageUrl: '', isActive: true }] // Default active
             });
             await fetchData();
@@ -194,7 +196,9 @@ const AdminBadgesDashboardPage: React.FC = () => {
     };
 
     const openProductEditModal = (p: Product) => {
-        setEditingProduct(JSON.parse(JSON.stringify(p)));
+        const editingP = JSON.parse(JSON.stringify(p));
+        if (!editingP.status) editingP.status = 'active'; // Handle legacy
+        setEditingProduct(editingP);
         setIsProductEditModalOpen(true);
     };
 
@@ -219,6 +223,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
         try {
             await updateDoc(doc(db, 'products', editingProduct.id), {
                 seriesName: editingProduct.seriesName,
+                status: editingProduct.status,
                 specs: editingProduct.specs,
                 basicDescription: editingProduct.basicDescription || '',
                 priceDescription: editingProduct.priceDescription || ''
@@ -485,7 +490,14 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                     <div key={product.id} className="bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col justify-between">
                                         <div>
                                             <div className="flex justify-between items-start mb-4">
-                                                <h3 className="text-lg font-bold text-siam-dark">{product.seriesName}</h3>
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-siam-dark">{product.seriesName}</h3>
+                                                    <div className="mt-1">
+                                                        {product.status === 'preview' && <span className="text-[10px] bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded font-bold">預覽</span>}
+                                                        {product.status === 'off' && <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-bold">下架</span>}
+                                                        {(!product.status || product.status === 'active') && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">上架</span>}
+                                                    </div>
+                                                </div>
                                                 <div className="flex gap-2">
                                                     <button onClick={() => openProductEditModal(product)} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                                                     <button onClick={() => handleDeleteProduct(product.id)} className="p-1 text-red-600 hover:bg-red-50 rounded"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
@@ -626,9 +638,23 @@ const AdminBadgesDashboardPage: React.FC = () => {
                 <Modal isOpen={isProductEditModalOpen} onClose={() => setIsProductEditModalOpen(false)} title="編輯商品系列" maxWidth="max-w-4xl">
                      {/* ... Same as before ... */}
                      <div className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">系列名稱</label>
-                            <input type="text" value={editingProduct.seriesName} onChange={e => setEditingProduct({...editingProduct, seriesName: e.target.value})} className="w-full p-2 border rounded" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">系列名稱</label>
+                                <input type="text" value={editingProduct.seriesName} onChange={e => setEditingProduct({...editingProduct, seriesName: e.target.value})} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">商品狀態</label>
+                                <select 
+                                    value={editingProduct.status || 'active'} 
+                                    onChange={e => setEditingProduct({...editingProduct, status: e.target.value as any})} 
+                                    className="w-full p-2 border rounded bg-white"
+                                >
+                                    <option value="active">上架 (Active)</option>
+                                    <option value="preview">預覽/預定開團 (Preview)</option>
+                                    <option value="off">下架 (Off)</option>
+                                </select>
+                            </div>
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

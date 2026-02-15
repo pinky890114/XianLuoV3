@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -8,7 +7,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { syncOrderToGoogleSheet } from '../services/googleSheetsService';
 import { sendBadgeOrderNotification } from '../services/discordService';
 
-const CATEGORIES = ['快閃櫥窗', '金屬徽章', '棉花製品'];
+const CATEGORIES = ['快閃櫥窗', '金屬徽章', '棉花製品', '預定開團'];
 
 // Extract SpecCard to prevent re-rendering issues and prop drilling
 interface SpecCardProps {
@@ -18,13 +17,21 @@ interface SpecCardProps {
     qty: number;
     onUpdate: (productId: string, idx: number, delta: number) => void;
     onInputChange: (productId: string, idx: number, value: string) => void;
+    isPreview?: boolean;
 }
 
-const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate, onInputChange }) => {
+const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate, onInputChange, isPreview = false }) => {
     return (
         <div className={`flex items-center justify-between p-3 rounded-lg border transition-all ${qty > 0 ? 'bg-siam-cream border-siam-brown ring-1 ring-siam-brown/20' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-center flex-1">
-                <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-14 h-14 rounded object-cover mr-3 flex-shrink-0" />
+            <div className="flex items-center flex-1 relative">
+                <div className="relative w-14 h-14 mr-3 flex-shrink-0">
+                    <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-full h-full rounded object-cover" />
+                    {isPreview && (
+                        <div className="absolute inset-0 bg-black/50 rounded flex items-center justify-center">
+                            <span className="text-[10px] text-white font-bold border border-white/80 px-1 py-0.5 rounded leading-none whitespace-nowrap transform -rotate-12">COMING SOON</span>
+                        </div>
+                    )}
+                </div>
                 <div className="text-left min-w-0">
                     <p className="font-bold text-siam-dark pr-2 leading-tight break-words whitespace-pre-wrap">{spec.specName}</p>
                     <p className="text-sm text-siam-blue">${spec.price}</p>
@@ -32,20 +39,26 @@ const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate
             </div>
             
             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                <button 
-                    onClick={() => onUpdate(productId, idx, -1)}
-                    className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold"
-                >-</button>
-                <input 
-                    type="number" 
-                    value={qty}
-                    onChange={(e) => onInputChange(productId, idx, e.target.value)}
-                    className="w-12 text-center p-1 border rounded bg-white font-bold text-siam-dark focus:ring-2 focus:ring-siam-blue outline-none"
-                />
-                <button 
-                    onClick={() => onUpdate(productId, idx, 1)}
-                    className="w-8 h-8 rounded-full bg-siam-blue text-white hover:bg-siam-dark flex items-center justify-center font-bold"
-                >+</button>
+                {isPreview ? (
+                    <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">預覽中</span>
+                ) : (
+                    <>
+                        <button 
+                            onClick={() => onUpdate(productId, idx, -1)}
+                            className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold"
+                        >-</button>
+                        <input 
+                            type="number" 
+                            value={qty}
+                            onChange={(e) => onInputChange(productId, idx, e.target.value)}
+                            className="w-12 text-center p-1 border rounded bg-white font-bold text-siam-dark focus:ring-2 focus:ring-siam-blue outline-none"
+                        />
+                        <button 
+                            onClick={() => onUpdate(productId, idx, 1)}
+                            className="w-8 h-8 rounded-full bg-siam-blue text-white hover:bg-siam-dark flex items-center justify-center font-bold"
+                        >+</button>
+                    </>
+                )}
             </div>
         </div>
     );
@@ -98,7 +111,17 @@ const SiamStallPage: React.FC = () => {
 
     // Filtered lists for UI
     const filteredSeries = useMemo(() => {
-        return products.filter(p => p.categoryId === viewCat);
+        return products.filter(p => {
+            const status = p.status || 'active'; // Handle legacy data
+            
+            if (status === 'off') return false; // Hide inactive products
+
+            if (viewCat === '預定開團') {
+                return status === 'preview';
+            }
+            // For normal categories, only show active products matching the category
+            return p.categoryId === viewCat && status === 'active';
+        });
     }, [products, viewCat]);
 
     const viewingSeries = useMemo(() => {
@@ -260,6 +283,8 @@ const SiamStallPage: React.FC = () => {
 
     if (isLoading) return <div className="flex justify-center p-20"><LoadingSpinner /></div>;
 
+    const isPreviewProduct = viewingSeries?.status === 'preview';
+
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-4xl min-h-screen">
              <style>{`
@@ -318,9 +343,16 @@ const SiamStallPage: React.FC = () => {
                                         <button
                                             key={p.id}
                                             onClick={() => setViewSeriesId(p.id)}
-                                            className={`p-4 rounded-lg text-left transition-all border ${viewSeriesId === p.id ? 'bg-siam-blue text-white border-siam-blue shadow-md' : 'bg-white text-siam-brown border-gray-200 hover:border-siam-blue/50'}`}
+                                            className={`p-4 rounded-lg text-left transition-all border relative overflow-hidden group ${viewSeriesId === p.id ? 'bg-siam-blue text-white border-siam-blue shadow-md' : 'bg-white text-siam-brown border-gray-200 hover:border-siam-blue/50'}`}
                                         >
-                                            <p className="font-bold">{p.seriesName}</p>
+                                            <div className="flex justify-between items-center">
+                                                <p className="font-bold">{p.seriesName}</p>
+                                                {p.status === 'preview' && (
+                                                    <span className="text-[10px] bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full font-bold ml-2 shadow-sm">
+                                                        預覽
+                                                    </span>
+                                                )}
+                                            </div>
                                         </button>
                                     ))}
                                     {filteredSeries.length === 0 && <p className="text-gray-400 italic">這攤沒貨，去別攤逛逛</p>}
@@ -358,6 +390,7 @@ const SiamStallPage: React.FC = () => {
                                 <h2 className="text-xl font-bold text-siam-dark mb-4 flex items-center gap-2">
                                     <span className="w-6 h-6 bg-siam-blue text-white rounded-full flex items-center justify-center text-xs">3</span>
                                     選擇規格與數量
+                                    {isPreviewProduct && <span className="ml-2 text-sm bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full font-bold">預覽模式 - 不可下單</span>}
                                 </h2>
 
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700 font-bold leading-relaxed">
@@ -382,6 +415,7 @@ const SiamStallPage: React.FC = () => {
                                                                 qty={getQuantity(viewingSeries.id, item.originalIndex)}
                                                                 onUpdate={updateCart}
                                                                 onInputChange={handleInputChange}
+                                                                isPreview={isPreviewProduct}
                                                             />
                                                         ))}
                                                     </div>
@@ -401,6 +435,7 @@ const SiamStallPage: React.FC = () => {
                                                                 qty={getQuantity(viewingSeries.id, item.originalIndex)}
                                                                 onUpdate={updateCart}
                                                                 onInputChange={handleInputChange}
+                                                                isPreview={isPreviewProduct}
                                                             />
                                                         ))}
                                                     </div>
@@ -421,6 +456,7 @@ const SiamStallPage: React.FC = () => {
                                                         qty={getQuantity(viewingSeries.id, idx)}
                                                         onUpdate={updateCart}
                                                         onInputChange={handleInputChange}
+                                                        isPreview={isPreviewProduct}
                                                     />
                                                 );
                                             })}

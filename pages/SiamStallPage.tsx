@@ -131,8 +131,12 @@ const SiamStallPage: React.FC = () => {
     }, [viewingSeries]);
 
     // Calculate Cart Totals
-    // FIX: Removing explicit generic from useMemo to ensure TypeScript correctly infers the returned object properties
-    const { totalPrice, totalItems, cartDetails } = useMemo(() => {
+    // Fixed: Added explicit generic to useMemo to ensure TypeScript correctly infers the returned object properties as non-unknown
+    const { totalPrice, totalItems, cartDetails } = useMemo<{
+        totalPrice: number;
+        totalItems: number;
+        cartDetails: string[];
+    }>(() => {
         let price = 0;
         let items = 0;
         const details: string[] = [];

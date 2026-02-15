@@ -24,6 +24,7 @@ const AdminDollsDashboardPage: React.FC = () => {
     const [selectedOrder, setSelectedOrder] = useState<DollOrder | null>(null);
     const [newStatus, setNewStatus] = useState<OrderStatus | null>(null);
     const [newImage, setNewImage] = useState<File | null>(null);
+    const [newReferenceImages, setNewReferenceImages] = useState<FileList | null>(null); // New state for adding reference images
     const [editingPrice, setEditingPrice] = useState<number | ''>('');
     const [editingRemarks, setEditingRemarks] = useState('');
     const [editingContact, setEditingContact] = useState('');
@@ -250,6 +251,7 @@ const AdminDollsDashboardPage: React.FC = () => {
         setIsEditModalOpen(false);
         setSelectedOrder(null);
         setNewImage(null);
+        setNewReferenceImages(null);
         setNewStatus(null);
         setEditingPrice('');
         setEditingRemarks('');
@@ -330,8 +332,18 @@ const AdminDollsDashboardPage: React.FC = () => {
             if (editingRemarks !== selectedOrder.remarks) updates.remarks = editingRemarks;
             if (editingContact !== selectedOrder.contact) updates.contact = editingContact;
             
+            // Upload progress images
             if (newImage) {
                 updates.progressImageUrls = arrayUnion(await uploadAndCompressImage(newImage, 'progress-images', 'progress'));
+            }
+
+            // Upload new reference images
+            if (newReferenceImages && newReferenceImages.length > 0) {
+                const uploadPromises = Array.from(newReferenceImages).map((file: File) => 
+                    uploadAndCompressImage(file, 'doll-references', 'reference')
+                );
+                const urls = await Promise.all(uploadPromises);
+                updates.referenceImageUrls = arrayUnion(...urls);
             }
 
             if (Object.keys(updates).length > 0) {
@@ -441,6 +453,60 @@ const AdminDollsDashboardPage: React.FC = () => {
             {selectedOrder && (<Modal isOpen={isEditModalOpen} onClose={closeEditModal} title={`管理訂單: ${selectedOrder.nickname} - ${selectedOrder.orderId}`} maxWidth="max-w-6xl">
                  <div className="flex flex-col md:flex-row gap-6 h-[70vh]">
                     <div className="md:w-1/2 space-y-4 overflow-y-auto pr-2">
+                        {/* 1. 客人上傳的參考圖 - 移到最上方並放大顯示 */}
+                        <div className="mb-6 p-4 border-2 border-dashed border-siam-blue/30 rounded-lg bg-siam-blue/5">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-bold text-siam-dark text-lg flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                    客人上傳的參考圖
+                                </h3>
+                                <label className="cursor-pointer text-xs bg-siam-blue text-white px-3 py-1.5 rounded hover:bg-siam-dark shadow-sm transition-colors flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    補傳圖片
+                                    <input 
+                                        type="file" 
+                                        multiple 
+                                        accept="image/*" 
+                                        hidden 
+                                        onChange={(e) => setNewReferenceImages(e.target.files)} 
+                                    />
+                                </label>
+                            </div>
+                            
+                            {/* 預覽準備補傳的圖片 */}
+                            {newReferenceImages && newReferenceImages.length > 0 && (
+                                <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-700 font-bold flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                    準備上傳 {newReferenceImages.length} 張新圖片... (請記得按下方儲存)
+                                </div>
+                            )}
+
+                            {selectedOrder.referenceImageUrls && selectedOrder.referenceImageUrls.length > 0 ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    {selectedOrder.referenceImageUrls.map((url, idx) => (
+                                        <div key={idx} className="relative group">
+                                            <a href={url} target="_blank" rel="noopener noreferrer" className="block aspect-square relative overflow-hidden rounded-lg border border-gray-300 shadow-sm bg-white">
+                                                <img src={url} alt={`參考圖 ${idx + 1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                            </a>
+                                            <a 
+                                                href={url} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="absolute bottom-1 right-1 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                放大查看
+                                            </a>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="bg-white p-6 rounded-lg border border-gray-200 text-center text-gray-400 italic flex flex-col items-center justify-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="opacity-50"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="3" x2="21" y2="21"/><line x1="21" y1="3" x2="3" y2="21"/></svg>
+                                    尚無參考圖片
+                                </div>
+                            )}
+                        </div>
+
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-sm font-bold text-gray-700">訂單狀態</label>
@@ -454,7 +520,7 @@ const AdminDollsDashboardPage: React.FC = () => {
                                 {DollOrderStatusArray.map(status => <option key={status} value={status}>{status}</option>)}
                             </select>
                         </div>
-                        {/* ... rest of the modal ... */}
+                        
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">委託明細 (唯讀)</label>
                             <div className="p-3 bg-gray-50 rounded border text-sm space-y-2">
@@ -462,20 +528,6 @@ const AdminDollsDashboardPage: React.FC = () => {
                                 <p><span className="font-bold">標題:</span> {selectedOrder.title}</p>
                                 <p><span className="font-bold">頭飾:</span> {selectedOrder.headpieceCraft}</p>
                                 <p><span className="font-bold">加購:</span> {selectedOrder.addons && selectedOrder.addons.length > 0 ? selectedOrder.addons.map(a => a.name).join(', ') : '無'}</p>
-                                
-                                {/* 顯示客人上傳的參考圖 */}
-                                {selectedOrder.referenceImageUrls && selectedOrder.referenceImageUrls.length > 0 && (
-                                    <div className="pt-2 mt-2 border-t border-gray-200">
-                                        <p className="font-bold mb-2 text-siam-blue">參考圖/說明圖:</p>
-                                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                            {selectedOrder.referenceImageUrls.map((url, idx) => (
-                                                <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block aspect-square relative group overflow-hidden rounded border border-gray-300 shadow-sm">
-                                                    <img src={url} alt={`參考圖 ${idx + 1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
 

@@ -175,9 +175,9 @@ const OrderStatusPage: React.FC = () => {
                     return (
                     <div key={order.id} className="bg-white/50 p-4 md:p-6 rounded-lg shadow-md border-t-4 border-siam-blue w-full max-w-full">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-                            <div className="w-full">
+                            <div className="w-full min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className={`text-xs px-2 py-0.5 rounded-full text-white ${isDoll ? 'bg-purple-600' : 'bg-teal-600'}`}>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full text-white shrink-0 ${isDoll ? 'bg-purple-600' : 'bg-teal-600'}`}>
                                         {isDoll ? '小餅訂單' : '地攤訂單'}
                                     </span>
                                     <span className="font-mono bg-white px-2 py-0.5 rounded text-sm break-all">{order.orderId}</span>
@@ -185,7 +185,7 @@ const OrderStatusPage: React.FC = () => {
                                 <h2 className="text-2xl font-bold text-siam-dark break-words">{title}</h2>
                                 <p className="text-sm text-siam-brown mt-1">暱稱: <span className="font-bold break-all">{order.nickname}</span></p>
                             </div>
-                            <div className="mt-2 md:mt-0 text-xl font-bold text-siam-cream bg-siam-blue px-4 py-1 rounded-full shadow-sm whitespace-nowrap self-start md:self-auto">
+                            <div className="mt-2 md:mt-0 text-xl font-bold text-siam-cream bg-siam-blue px-4 py-1 rounded-full shadow-sm whitespace-nowrap self-start md:self-auto shrink-0">
                                 {normalizeStatus(order.status)}
                             </div>
                         </div>
@@ -270,7 +270,7 @@ const OrderStatusPage: React.FC = () => {
                         {isDoll ? (
                             <div className="grid md:grid-cols-2 gap-8 mt-4">
                                 {/* Left Column: Images & Instructions */}
-                                <div className="space-y-8 w-full max-w-full">
+                                <div className="space-y-8 w-full min-w-0">
                                     <div>
                                         <h3 className="font-bold text-lg text-siam-dark mb-3 border-b border-siam-blue/20 pb-1">進度預覽</h3>
                                         {order.progressImageUrls.length > 0 ? (
@@ -287,7 +287,7 @@ const OrderStatusPage: React.FC = () => {
                                 </div>
 
                                 {/* Right Column: Messages & Notes */}
-                                <div className="flex flex-col h-full w-full max-w-full">
+                                <div className="flex flex-col h-full w-full min-w-0">
                                     <h3 className="font-bold text-lg text-siam-dark mb-3 border-b border-siam-blue/20 pb-1">留言板</h3>
                                     <div className="bg-white/60 rounded-lg p-4 flex-grow flex flex-col h-[500px]">
                                         {/* Messages Display Area */}
@@ -309,19 +309,19 @@ const OrderStatusPage: React.FC = () => {
                                         </div>
 
                                         {/* Message Input Area */}
-                                        <form onSubmit={(e) => handleSendMessage(order, e)} className="border-t border-gray-200 pt-3">
-                                            <div className="flex gap-2">
+                                        <form onSubmit={(e) => handleSendMessage(order, e)} className="border-t border-gray-200 pt-3 w-full">
+                                            <div className="flex gap-2 w-full">
                                                 <input 
                                                     type="text" 
                                                     value={newMessage}
                                                     onChange={(e) => setNewMessage(e.target.value)}
                                                     placeholder="輸入訊息..." 
-                                                    className="flex-grow p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-dark outline-none bg-white min-w-0"
+                                                    className="flex-1 p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-dark outline-none bg-white min-w-0"
                                                 />
                                                 <button 
                                                     type="submit" 
                                                     disabled={!newMessage.trim() || sendingMsgId === order.id}
-                                                    className="bg-siam-brown text-siam-cream px-4 py-2 rounded-md hover:bg-siam-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                                    className="bg-siam-brown text-siam-cream px-4 py-2 rounded-md hover:bg-siam-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
                                                 >
                                                     {sendingMsgId === order.id ? '...' : '發送'}
                                                 </button>
@@ -332,7 +332,7 @@ const OrderStatusPage: React.FC = () => {
                             </div>
                         ) : (
                             /* Badge Order Layout - Horizontal Message Board (Full Width) */
-                            <div className="mt-6 w-full max-w-full">
+                            <div className="mt-6 w-full min-w-0">
                                 <h3 className="font-bold text-lg text-siam-dark mb-3 border-b border-siam-blue/20 pb-1">留言板</h3>
                                 <div className="bg-white/60 rounded-lg p-4 flex flex-col h-[400px]">
                                     {/* Messages Display Area */}
@@ -354,19 +354,19 @@ const OrderStatusPage: React.FC = () => {
                                     </div>
 
                                     {/* Message Input Area */}
-                                    <form onSubmit={(e) => handleSendMessage(order, e)} className="border-t border-gray-200 pt-3">
-                                        <div className="flex gap-2">
+                                    <form onSubmit={(e) => handleSendMessage(order, e)} className="border-t border-gray-200 pt-3 w-full">
+                                        <div className="flex gap-2 w-full">
                                             <input 
                                                 type="text" 
                                                 value={newMessage}
                                                 onChange={(e) => setNewMessage(e.target.value)}
                                                 placeholder="輸入訊息..." 
-                                                className="flex-grow p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-dark outline-none bg-white min-w-0"
+                                                className="flex-1 p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-dark outline-none bg-white min-w-0"
                                             />
                                             <button 
                                                 type="submit" 
                                                 disabled={!newMessage.trim() || sendingMsgId === order.id}
-                                                className="bg-siam-brown text-siam-cream px-4 py-2 rounded-md hover:bg-siam-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                                className="bg-siam-brown text-siam-cream px-4 py-2 rounded-md hover:bg-siam-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
                                             >
                                                 {sendingMsgId === order.id ? '...' : '發送'}
                                             </button>

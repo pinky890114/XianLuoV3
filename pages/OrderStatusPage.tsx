@@ -117,7 +117,7 @@ const OrderStatusPage: React.FC = () => {
     const getStatusIndex = (status: string, statusArray: string[]) => statusArray.indexOf(normalizeStatus(status) as any);
 
     return (
-        <div className="container mx-auto p-4 md:p-8 max-w-5xl">
+        <div className="container mx-auto p-4 md:p-8 max-w-5xl overflow-hidden">
             <style>{`
                 .hide-scrollbar::-webkit-scrollbar { display: none; }
                 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -126,8 +126,8 @@ const OrderStatusPage: React.FC = () => {
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                 <span>返回首頁</span>
             </Link>
-            <h1 className="text-4xl font-bold text-siam-dark mb-2">訂單進度查詢</h1>
-            <p className="text-lg text-siam-brown mb-8">請用 <span className="font-bold text-siam-dark">暱稱</span> 或 <span className="font-bold text-siam-dark">訂單編號</span> 查詢進度</p>
+            <h1 className="text-4xl font-bold text-siam-dark mb-2 break-words">訂單進度查詢</h1>
+            <p className="text-lg text-siam-brown mb-8 break-words">請用 <span className="font-bold text-siam-dark">暱稱</span> 或 <span className="font-bold text-siam-dark">訂單編號</span> 查詢進度</p>
             
             <form onSubmit={handleSearch} className="bg-white/50 p-6 rounded-lg shadow-md flex flex-col sm:flex-row gap-4 mb-8">
                 <input 
@@ -173,14 +173,14 @@ const OrderStatusPage: React.FC = () => {
                     ].sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
 
                     return (
-                    <div key={order.id} className="bg-white/50 p-4 md:p-6 rounded-lg shadow-md border-t-4 border-siam-blue">
+                    <div key={order.id} className="bg-white/50 p-4 md:p-6 rounded-lg shadow-md border-t-4 border-siam-blue w-full max-w-full">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
                             <div className="w-full">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className={`text-xs px-2 py-0.5 rounded-full text-white ${isDoll ? 'bg-purple-600' : 'bg-teal-600'}`}>
                                         {isDoll ? '小餅訂單' : '地攤訂單'}
                                     </span>
-                                    <span className="font-mono bg-white px-2 py-0.5 rounded text-sm">{order.orderId}</span>
+                                    <span className="font-mono bg-white px-2 py-0.5 rounded text-sm break-all">{order.orderId}</span>
                                 </div>
                                 <h2 className="text-2xl font-bold text-siam-dark break-words">{title}</h2>
                                 <p className="text-sm text-siam-brown mt-1">暱稱: <span className="font-bold break-all">{order.nickname}</span></p>
@@ -237,7 +237,7 @@ const OrderStatusPage: React.FC = () => {
                         </div>
 
                         {/* Order Details Section */}
-                        <div className="bg-white/40 p-4 rounded-lg mb-6 border border-siam-blue/10">
+                        <div className="bg-white/40 p-4 rounded-lg mb-6 border border-siam-blue/10 w-full max-w-full">
                             <h3 className="font-bold text-lg text-siam-dark mb-2 border-b border-siam-blue/20 pb-1">委託明細</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                 {isDoll && (
@@ -270,7 +270,7 @@ const OrderStatusPage: React.FC = () => {
                         {isDoll ? (
                             <div className="grid md:grid-cols-2 gap-8 mt-4">
                                 {/* Left Column: Images & Instructions */}
-                                <div className="space-y-8">
+                                <div className="space-y-8 w-full max-w-full">
                                     <div>
                                         <h3 className="font-bold text-lg text-siam-dark mb-3 border-b border-siam-blue/20 pb-1">進度預覽</h3>
                                         {order.progressImageUrls.length > 0 ? (
@@ -287,7 +287,7 @@ const OrderStatusPage: React.FC = () => {
                                 </div>
 
                                 {/* Right Column: Messages & Notes */}
-                                <div className="flex flex-col h-full">
+                                <div className="flex flex-col h-full w-full max-w-full">
                                     <h3 className="font-bold text-lg text-siam-dark mb-3 border-b border-siam-blue/20 pb-1">留言板</h3>
                                     <div className="bg-white/60 rounded-lg p-4 flex-grow flex flex-col h-[500px]">
                                         {/* Messages Display Area */}
@@ -316,7 +316,7 @@ const OrderStatusPage: React.FC = () => {
                                                     value={newMessage}
                                                     onChange={(e) => setNewMessage(e.target.value)}
                                                     placeholder="輸入訊息..." 
-                                                    className="flex-grow p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-dark outline-none bg-white"
+                                                    className="flex-grow p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-dark outline-none bg-white min-w-0"
                                                 />
                                                 <button 
                                                     type="submit" 
@@ -332,7 +332,7 @@ const OrderStatusPage: React.FC = () => {
                             </div>
                         ) : (
                             /* Badge Order Layout - Horizontal Message Board (Full Width) */
-                            <div className="mt-6">
+                            <div className="mt-6 w-full max-w-full">
                                 <h3 className="font-bold text-lg text-siam-dark mb-3 border-b border-siam-blue/20 pb-1">留言板</h3>
                                 <div className="bg-white/60 rounded-lg p-4 flex flex-col h-[400px]">
                                     {/* Messages Display Area */}
@@ -361,7 +361,7 @@ const OrderStatusPage: React.FC = () => {
                                                 value={newMessage}
                                                 onChange={(e) => setNewMessage(e.target.value)}
                                                 placeholder="輸入訊息..." 
-                                                className="flex-grow p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-dark outline-none bg-white"
+                                                className="flex-grow p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-dark outline-none bg-white min-w-0"
                                             />
                                             <button 
                                                 type="submit" 

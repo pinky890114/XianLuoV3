@@ -462,6 +462,20 @@ const AdminDollsDashboardPage: React.FC = () => {
                                 <p><span className="font-bold">標題:</span> {selectedOrder.title}</p>
                                 <p><span className="font-bold">頭飾:</span> {selectedOrder.headpieceCraft}</p>
                                 <p><span className="font-bold">加購:</span> {selectedOrder.addons && selectedOrder.addons.length > 0 ? selectedOrder.addons.map(a => a.name).join(', ') : '無'}</p>
+                                
+                                {/* 顯示客人上傳的參考圖 */}
+                                {selectedOrder.referenceImageUrls && selectedOrder.referenceImageUrls.length > 0 && (
+                                    <div className="pt-2 mt-2 border-t border-gray-200">
+                                        <p className="font-bold mb-2 text-siam-blue">參考圖/說明圖:</p>
+                                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                            {selectedOrder.referenceImageUrls.map((url, idx) => (
+                                                <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block aspect-square relative group overflow-hidden rounded border border-gray-300 shadow-sm">
+                                                    <img src={url} alt={`參考圖 ${idx + 1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

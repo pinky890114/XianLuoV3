@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { collection, getDocs, query, doc, addDoc, updateDoc, deleteDoc, writeBatch, Timestamp, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../firebaseConfig';
-import { Product, ProductSpec, BadgeOrder, OrderStatus, BadgeOrderStatusArray } from '../types';
+import { Product, ProductSpec, BadgeOrder, OrderStatus, BadgeOrderStatusArray, ProductSpecStatus } from '../types';
 import { uploadAndCompressImage } from '../utils/imageUploader';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Modal from '../components/Modal';
@@ -110,8 +110,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
                 batch.set(newDocRef, {
                     categoryId: item.cat,
                     seriesName: item.name,
-                    status: 'active',
-                    specs: [{ specName: '預設規格', price: 0, imageUrl: '', isActive: true }]
+                    specs: [{ specName: '預設規格', price: 0, imageUrl: '', status: 'active' }]
                 });
                 hasUpdates = true;
             }
@@ -125,26 +124,6 @@ const AdminBadgesDashboardPage: React.FC = () => {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     // --- Product Management Logic ---
-
-    const handleUpdateSpec = async (productId: string, specs: ProductSpec[]) => {
-        setIsUpdating(true);
-        try {
-            await updateDoc(doc(db, 'products', productId), { specs });
-            setProducts(prev => prev.map(p => p.id === productId ? { ...p, specs } : p));
-        } catch (err) {
-            setInfoModalState({ title: '錯誤', message: '更新失敗' });
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-
-    const handleToggleActive = (productId: string, specIndex: number) => {
-        const product = products.find(p => p.id === productId);
-        if (!product) return;
-        const newSpecs = [...product.specs];
-        newSpecs[specIndex].isActive = !newSpecs[specIndex].isActive;
-        handleUpdateSpec(productId, newSpecs);
-    };
 
     const handleDeleteProduct = (id: string) => {
         const product = products.find(p => p.id === id);
@@ -182,8 +161,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
             await addDoc(collection(db, 'products'), {
                 categoryId: newSeriesCategory,
                 seriesName: newSeriesName.trim(),
-                status: 'active', // Default status
-                specs: [{ specName: '預設規格', price: 0, imageUrl: '', isActive: true }] // Default active
+                specs: [{ specName: '預設規格', price: 0, imageUrl: '', status: 'active' }] // Default active
             });
             await fetchData();
             setIsAddSeriesModalOpen(false);
@@ -196,8 +174,13 @@ const AdminBadgesDashboardPage: React.FC = () => {
     };
 
     const openProductEditModal = (p: Product) => {
+        // Ensure legacy data has status
         const editingP = JSON.parse(JSON.stringify(p));
-        if (!editingP.status) editingP.status = 'active'; // Handle legacy
+        editingP.specs.forEach((s: ProductSpec) => {
+            if (!s.status) {
+                s.status = s.isActive === false ? 'off' : 'active';
+            }
+        });
         setEditingProduct(editingP);
         setIsProductEditModalOpen(true);
     };
@@ -206,7 +189,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
         if (!editingProduct) return;
         setEditingProduct({
             ...editingProduct,
-            specs: [...editingProduct.specs, { specName: '新規格', price: 0, imageUrl: '', isActive: true }] // Default active
+            specs: [...editingProduct.specs, { specName: '新規格', price: 0, imageUrl: '', status: 'active' }] // Default active
         });
     };
 
@@ -223,7 +206,6 @@ const AdminBadgesDashboardPage: React.FC = () => {
         try {
             await updateDoc(doc(db, 'products', editingProduct.id), {
                 seriesName: editingProduct.seriesName,
-                status: editingProduct.status,
                 specs: editingProduct.specs,
                 basicDescription: editingProduct.basicDescription || '',
                 priceDescription: editingProduct.priceDescription || ''
@@ -490,14 +472,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                     <div key={product.id} className="bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col justify-between">
                                         <div>
                                             <div className="flex justify-between items-start mb-4">
-                                                <div>
-                                                    <h3 className="text-lg font-bold text-siam-dark">{product.seriesName}</h3>
-                                                    <div className="mt-1">
-                                                        {product.status === 'preview' && <span className="text-[10px] bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded font-bold">預覽</span>}
-                                                        {product.status === 'off' && <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-bold">下架</span>}
-                                                        {(!product.status || product.status === 'active') && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">上架</span>}
-                                                    </div>
-                                                </div>
+                                                <h3 className="text-lg font-bold text-siam-dark">{product.seriesName}</h3>
                                                 <div className="flex gap-2">
                                                     <button onClick={() => openProductEditModal(product)} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                                                     <button onClick={() => handleDeleteProduct(product.id)} className="p-1 text-red-600 hover:bg-red-50 rounded"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
@@ -507,13 +482,16 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                                 {product.specs.map((spec, idx) => (
                                                     <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
                                                         <div className="flex items-center">
-                                                            <div className={`w-2 h-2 rounded-full mr-2 ${spec.isActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                            {/* Status Indicator */}
+                                                            <div className={`w-2 h-2 rounded-full mr-2 ${spec.status === 'active' || spec.isActive ? 'bg-green-500' : spec.status === 'preview' ? 'bg-yellow-500' : 'bg-gray-400'}`}></div>
                                                             {/* Display Style if exists */}
                                                             {spec.style && <span className="bg-siam-blue/10 text-siam-blue px-1.5 rounded mr-1 text-xs">{spec.style}</span>}
-                                                            <span className={spec.isActive ? '' : 'text-gray-400 line-through'}>{spec.specName}</span>
+                                                            <span className={spec.status === 'off' ? 'text-gray-400 line-through' : ''}>{spec.specName}</span>
                                                             <span className="ml-2 text-siam-blue font-bold">${spec.price}</span>
                                                         </div>
-                                                        <button onClick={() => handleToggleActive(product.id, idx)} className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${spec.isActive ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{spec.isActive ? '停用' : '啟用'}</button>
+                                                        <span className="text-xs text-gray-500">
+                                                            {spec.status === 'preview' ? '預覽' : spec.status === 'off' ? '截單' : '上架'}
+                                                        </span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -638,23 +616,9 @@ const AdminBadgesDashboardPage: React.FC = () => {
                 <Modal isOpen={isProductEditModalOpen} onClose={() => setIsProductEditModalOpen(false)} title="編輯商品系列" maxWidth="max-w-4xl">
                      {/* ... Same as before ... */}
                      <div className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">系列名稱</label>
-                                <input type="text" value={editingProduct.seriesName} onChange={e => setEditingProduct({...editingProduct, seriesName: e.target.value})} className="w-full p-2 border rounded" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">商品狀態</label>
-                                <select 
-                                    value={editingProduct.status || 'active'} 
-                                    onChange={e => setEditingProduct({...editingProduct, status: e.target.value as any})} 
-                                    className="w-full p-2 border rounded bg-white"
-                                >
-                                    <option value="active">上架 (Active)</option>
-                                    <option value="preview">預覽/預定開團 (Preview)</option>
-                                    <option value="off">下架 (Off)</option>
-                                </select>
-                            </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">系列名稱</label>
+                            <input type="text" value={editingProduct.seriesName} onChange={e => setEditingProduct({...editingProduct, seriesName: e.target.value})} className="w-full p-2 border rounded" />
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -699,7 +663,27 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                                 <input type="number" placeholder="價格" value={spec.price} onChange={e => { const newSpecs = [...editingProduct.specs]; newSpecs[idx].price = Number(e.target.value); setEditingProduct({...editingProduct, specs: newSpecs}); }} className="w-full p-1 border rounded text-sm" />
                                             </div>
                                             
-                                            <div className="col-span-3 flex justify-between items-center pt-2"><label className="flex items-center text-xs"><input type="checkbox" checked={spec.isActive} onChange={() => { const newSpecs = [...editingProduct.specs]; newSpecs[idx].isActive = !newSpecs[idx].isActive; setEditingProduct({...editingProduct, specs: newSpecs}); }} className="mr-1" /> 開單中</label><button onClick={() => handleRemoveSpecFromEditing(idx)} className="text-red-500 text-xs">刪除</button></div>
+                                            <div className="col-span-3 flex justify-between items-center pt-2">
+                                                <div className="flex items-center gap-2">
+                                                    <label className="text-xs font-bold text-gray-600">狀態:</label>
+                                                    <select 
+                                                        value={spec.status || 'active'} 
+                                                        onChange={e => { 
+                                                            const newSpecs = [...editingProduct.specs]; 
+                                                            newSpecs[idx].status = e.target.value as ProductSpecStatus;
+                                                            // Legacy sync
+                                                            newSpecs[idx].isActive = e.target.value === 'active';
+                                                            setEditingProduct({...editingProduct, specs: newSpecs}); 
+                                                        }} 
+                                                        className="text-xs p-1 border rounded bg-white"
+                                                    >
+                                                        <option value="active">上架中</option>
+                                                        <option value="preview">預覽中</option>
+                                                        <option value="off">截單</option>
+                                                    </select>
+                                                </div>
+                                                <button onClick={() => handleRemoveSpecFromEditing(idx)} className="text-red-500 text-xs">刪除</button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

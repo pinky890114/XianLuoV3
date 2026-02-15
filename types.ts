@@ -112,19 +112,21 @@ export interface DollOrder {
 
 // --- 暹羅地攤相關型別 ---
 
+export type ProductSpecStatus = 'active' | 'preview' | 'off';
+
 export interface ProductSpec {
     style?: string; // e.g., '長歌', '藏劍' - 用於前台分組顯示
     specName: string;
     price: number;
     imageUrl: string;
-    isActive: boolean;
+    status?: ProductSpecStatus; // active: 上架, preview: 預覽, off: 截單 (replaced isActive)
+    isActive?: boolean; // @deprecated use status instead
 }
 
 export interface Product {
     id: string;
     categoryId: string; // 如：'快閃櫥窗', '金屬徽章', '棉花製品'
     seriesName: string; // 如：'【goodslove】劍影俠光'
-    status?: 'active' | 'preview' | 'off'; // 商品狀態：active(上架/預設), preview(預覽/預定開團), off(下架)
     specs: ProductSpec[];
     basicDescription?: string; // 基本說明
     priceDescription?: string; // 價格說明

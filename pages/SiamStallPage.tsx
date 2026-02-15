@@ -1,13 +1,20 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import { Product, OrderStatus, BadgeOrder, ProductSpec } from '../types';
+import { Product, OrderStatus, BadgeOrder, ProductSpec, ProductSpecStatus } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { syncOrderToGoogleSheet } from '../services/googleSheetsService';
 import { sendBadgeOrderNotification } from '../services/discordService';
 
 const CATEGORIES = ['快閃櫥窗', '金屬徽章', '棉花製品', '預定開團'];
+
+// Helper to determine status compatible with legacy isActive
+const getSpecStatus = (spec: ProductSpec): ProductSpecStatus => {
+    if (spec.status) return spec.status;
+    return spec.isActive ? 'active' : 'off';
+};
 
 // Extract SpecCard to prevent re-rendering issues and prop drilling
 interface SpecCardProps {
@@ -17,17 +24,19 @@ interface SpecCardProps {
     qty: number;
     onUpdate: (productId: string, idx: number, delta: number) => void;
     onInputChange: (productId: string, idx: number, value: string) => void;
-    isPreview?: boolean;
 }
 
-const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate, onInputChange, isPreview = false }) => {
+const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate, onInputChange }) => {
+    const status = getSpecStatus(spec);
+    const isPreview = status === 'preview';
+
     return (
         <div className={`flex items-center justify-between p-3 rounded-lg border transition-all ${qty > 0 ? 'bg-siam-cream border-siam-brown ring-1 ring-siam-brown/20' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-center flex-1 relative">
+            <div className="flex items-center flex-1 relative overflow-hidden">
                 <div className="relative w-14 h-14 mr-3 flex-shrink-0">
                     <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-full h-full rounded object-cover" />
                     {isPreview && (
-                        <div className="absolute inset-0 bg-black/50 rounded flex items-center justify-center">
+                        <div className="absolute inset-0 bg-black/60 rounded flex items-center justify-center z-10 backdrop-blur-[1px]">
                             <span className="text-[10px] text-white font-bold border border-white/80 px-1 py-0.5 rounded leading-none whitespace-nowrap transform -rotate-12">COMING SOON</span>
                         </div>
                     )}
@@ -40,7 +49,9 @@ const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate
             
             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                 {isPreview ? (
-                    <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">預覽中</span>
+                    <span className="text-xs font-bold text-siam-brown/70 bg-siam-brown/10 px-3 py-1.5 rounded-full border border-siam-brown/20">
+                        預覽中
+                    </span>
                 ) : (
                     <>
                         <button 
@@ -112,15 +123,14 @@ const SiamStallPage: React.FC = () => {
     // Filtered lists for UI
     const filteredSeries = useMemo(() => {
         return products.filter(p => {
-            const status = p.status || 'active'; // Handle legacy data
-            
-            if (status === 'off') return false; // Hide inactive products
+            const hasPreview = p.specs.some(s => getSpecStatus(s) === 'preview');
+            const hasActive = p.specs.some(s => getSpecStatus(s) === 'active');
 
             if (viewCat === '預定開團') {
-                return status === 'preview';
+                return hasPreview;
             }
-            // For normal categories, only show active products matching the category
-            return p.categoryId === viewCat && status === 'active';
+            // For normal categories, show if it matches category AND has active specs
+            return p.categoryId === viewCat && hasActive;
         });
     }, [products, viewCat]);
 
@@ -132,17 +142,31 @@ const SiamStallPage: React.FC = () => {
     const groupedSpecs = useMemo<{ groups: Record<string, { spec: ProductSpec, originalIndex: number }[]>, other: { spec: ProductSpec, originalIndex: number }[] } | null>(() => {
         if (!viewingSeries || !viewingSeries.specs) return null;
         
-        // Check if any spec has a style
-        const hasStyles = viewingSeries.specs.some(s => s.style && s.style.trim() !== '');
-        
-        if (!hasStyles) return null;
+        // Filter specs based on current Category View
+        // If viewing '預定開團', show PREVIEW specs.
+        // Otherwise, show ACTIVE specs.
+        const targetStatus: ProductSpecStatus = viewCat === '預定開團' ? 'preview' : 'active';
 
+        const relevantSpecs = viewingSeries.specs.map((spec, idx) => ({ spec, idx }))
+            .filter(({ spec }) => getSpecStatus(spec) === targetStatus);
+
+        if (relevantSpecs.length === 0) return null;
+
+        // Check if any spec has a style
+        const hasStyles = relevantSpecs.some(({ spec }) => spec.style && spec.style.trim() !== '');
+        
         const groups: Record<string, { spec: ProductSpec, originalIndex: number }[]> = {};
         const other: { spec: ProductSpec, originalIndex: number }[] = [];
 
-        viewingSeries.specs.forEach((spec, idx) => {
-            if (!spec.isActive) return;
-            
+        if (!hasStyles) {
+            // If no styles, put everything in other (to trigger flat list)
+             relevantSpecs.forEach(({ spec, idx }) => {
+                 other.push({ spec, originalIndex: idx });
+             });
+             return { groups: {}, other }; // Special case to just return flat list logic below
+        }
+
+        relevantSpecs.forEach(({ spec, idx }) => {
             if (spec.style && spec.style.trim() !== '') {
                 if (!groups[spec.style]) groups[spec.style] = [];
                 groups[spec.style].push({ spec, originalIndex: idx });
@@ -152,7 +176,7 @@ const SiamStallPage: React.FC = () => {
         });
 
         return { groups, other };
-    }, [viewingSeries]);
+    }, [viewingSeries, viewCat]);
 
     // Calculate Cart Totals
     const cartSummary = useMemo(() => {
@@ -283,7 +307,7 @@ const SiamStallPage: React.FC = () => {
 
     if (isLoading) return <div className="flex justify-center p-20"><LoadingSpinner /></div>;
 
-    const isPreviewProduct = viewingSeries?.status === 'preview';
+    const hasAnySpecsToShow = groupedSpecs && (Object.keys(groupedSpecs.groups).length > 0 || groupedSpecs.other.length > 0);
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-4xl min-h-screen">
@@ -347,11 +371,6 @@ const SiamStallPage: React.FC = () => {
                                         >
                                             <div className="flex justify-between items-center">
                                                 <p className="font-bold">{p.seriesName}</p>
-                                                {p.status === 'preview' && (
-                                                    <span className="text-[10px] bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full font-bold ml-2 shadow-sm">
-                                                        預覽
-                                                    </span>
-                                                )}
                                             </div>
                                         </button>
                                     ))}
@@ -389,8 +408,7 @@ const SiamStallPage: React.FC = () => {
                             <section className="animate-slideUp">
                                 <h2 className="text-xl font-bold text-siam-dark mb-4 flex items-center gap-2">
                                     <span className="w-6 h-6 bg-siam-blue text-white rounded-full flex items-center justify-center text-xs">3</span>
-                                    選擇規格與數量
-                                    {isPreviewProduct && <span className="ml-2 text-sm bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full font-bold">預覽模式 - 不可下單</span>}
+                                    {viewCat === '預定開團' ? '預覽商品規格' : '選擇規格與數量'}
                                 </h2>
 
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700 font-bold leading-relaxed">
@@ -398,9 +416,9 @@ const SiamStallPage: React.FC = () => {
                                     以上價格皆不包含運費、集運費和賣貨便運費 。
                                 </div>
                                 
-                                {viewingSeries.specs.some(s => s.isActive) ? (
-                                    groupedSpecs ? (
-                                        // Render grouped specs
+                                {hasAnySpecsToShow ? (
+                                    // Grouped Specs Logic
+                                    groupedSpecs && Object.keys(groupedSpecs.groups).length > 0 ? (
                                         <div className="space-y-6">
                                             {Object.entries(groupedSpecs.groups).map(([styleName, items]: [string, { spec: ProductSpec, originalIndex: number }[]]) => (
                                                 <div key={styleName} className="bg-gray-50 p-4 rounded-lg border border-gray-100">
@@ -415,7 +433,6 @@ const SiamStallPage: React.FC = () => {
                                                                 qty={getQuantity(viewingSeries.id, item.originalIndex)}
                                                                 onUpdate={updateCart}
                                                                 onInputChange={handleInputChange}
-                                                                isPreview={isPreviewProduct}
                                                             />
                                                         ))}
                                                     </div>
@@ -435,7 +452,6 @@ const SiamStallPage: React.FC = () => {
                                                                 qty={getQuantity(viewingSeries.id, item.originalIndex)}
                                                                 onUpdate={updateCart}
                                                                 onInputChange={handleInputChange}
-                                                                isPreview={isPreviewProduct}
                                                             />
                                                         ))}
                                                     </div>
@@ -443,28 +459,24 @@ const SiamStallPage: React.FC = () => {
                                             )}
                                         </div>
                                     ) : (
-                                        // Render flat specs (classic view)
+                                        // Flat Specs Logic (when no groups)
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            {viewingSeries.specs.map((spec, idx) => {
-                                                if (!spec.isActive) return null;
-                                                return (
-                                                    <SpecCard 
-                                                        key={`${viewingSeries.id}-${idx}`}
-                                                        spec={spec} 
-                                                        idx={idx} 
-                                                        productId={viewingSeries.id}
-                                                        qty={getQuantity(viewingSeries.id, idx)}
-                                                        onUpdate={updateCart}
-                                                        onInputChange={handleInputChange}
-                                                        isPreview={isPreviewProduct}
-                                                    />
-                                                );
-                                            })}
+                                            {groupedSpecs && groupedSpecs.other.map((item) => (
+                                                <SpecCard 
+                                                    key={`${viewingSeries.id}-${item.originalIndex}`}
+                                                    spec={item.spec} 
+                                                    idx={item.originalIndex} 
+                                                    productId={viewingSeries.id}
+                                                    qty={getQuantity(viewingSeries.id, item.originalIndex)}
+                                                    onUpdate={updateCart}
+                                                    onInputChange={handleInputChange}
+                                                />
+                                            ))}
                                         </div>
                                     )
                                 ) : (
                                     <div className="col-span-full text-center p-8 bg-gray-100 rounded-lg text-gray-500 font-bold text-lg">
-                                        預購已終止，下次手快
+                                        {viewCat === '預定開團' ? '目前沒有預覽商品' : '商品已完售或下架'}
                                     </div>
                                 )}
                             </section>

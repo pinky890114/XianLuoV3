@@ -144,7 +144,7 @@ const AdminDollsDashboardPage: React.FC = () => {
     };
 
     const executeBatchDelete = async () => {
-        if (batchDeleteInput !== '確認刪除') {
+        if (batchDeleteInput.trim() !== '確認刪除') {
             setInfoModalState({ title: '錯誤', message: '輸入驗證碼錯誤。' });
             return;
         }
@@ -371,8 +371,9 @@ const AdminDollsDashboardPage: React.FC = () => {
                 <div className="flex items-center gap-4 flex-wrap">
                     {selectedOrderIds.size > 0 && (
                         <button 
+                            type="button"
                             onClick={openBatchDeleteModal}
-                            className="bg-red-600 text-white py-2 px-4 rounded-lg shadow-sm hover:bg-red-700 transition-all flex items-center gap-2 animate-bounce-in"
+                            className="bg-red-600 text-white py-2 px-4 rounded-lg shadow-sm hover:bg-red-700 transition-all flex items-center gap-2"
                         >
                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                             刪除選取 ({selectedOrderIds.size})
@@ -583,6 +584,22 @@ const AdminDollsDashboardPage: React.FC = () => {
             </Modal>
 
             {/* ... Info and Confirm modals ... */}
+             <Modal isOpen={isBatchDeleteModalOpen} onClose={() => setIsBatchDeleteModalOpen(false)} title="⚠️ 批次刪除確認">
+                <div className="space-y-4">
+                    <div className="bg-red-50 border border-red-200 rounded p-4 text-red-700">
+                        <p className="font-bold text-lg mb-2">嚴重警告：此動作無法復原！</p>
+                        <p>您即將永久刪除 <span className="font-bold text-xl">{selectedOrderIds.size}</span> 筆訂單。</p>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">請輸入「確認刪除」以執行此操作：</label>
+                        <input type="text" value={batchDeleteInput} onChange={(e) => setBatchDeleteInput(e.target.value)} placeholder="確認刪除" className="w-full p-2 border border-red-300 rounded focus:ring-2 focus:ring-red-500 outline-none" />
+                    </div>
+                    <div className="flex justify-end space-x-3 pt-2">
+                        <button onClick={() => setIsBatchDeleteModalOpen(false)} className="px-4 py-2 text-gray-600 bg-gray-100 rounded">取消</button>
+                        <button onClick={executeBatchDelete} disabled={batchDeleteInput.trim() !== '確認刪除' || isUpdating} className="px-4 py-2 bg-red-600 text-white rounded flex items-center">{isUpdating ? <LoadingSpinner /> : '確認刪除'}</button>
+                    </div>
+                </div>
+            </Modal>
              {infoModalState && (
                 <Modal isOpen={!!infoModalState} onClose={() => setInfoModalState(null)} title={infoModalState.title}>
                     <div className="p-4 space-y-4">

@@ -105,6 +105,7 @@ const AdoptionWizardPage: React.FC = () => {
 
     // Form Data States
     const [nickname, setNickname] = useState('');
+    const [contact, setContact] = useState('');
     const [title, setTitle] = useState('');
     const [headpieceCraft, setHeadpieceCraft] = useState<HeadpieceCraft>(HeadpieceCraft.NONE);
     const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
@@ -151,8 +152,8 @@ const AdoptionWizardPage: React.FC = () => {
     // Handle form submission to Firebase and external services
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!nickname || !title || !referenceImages || referenceImages.length === 0) {
-            alert('請填寫完整資料並上傳參考圖');
+        if (!nickname || !contact || !title || !referenceImages || referenceImages.length === 0) {
+            alert('請填寫完整資料（含暱稱、聯絡方式、委託內容）並上傳參考圖');
             return;
         }
 
@@ -171,6 +172,7 @@ const AdoptionWizardPage: React.FC = () => {
             const orderData: Omit<DollOrder, 'id'> = {
                 orderId,
                 nickname,
+                contact,
                 title,
                 headpieceCraft,
                 referenceImageUrls: imageUrls,
@@ -193,6 +195,7 @@ const AdoptionWizardPage: React.FC = () => {
             // 4. Send notification to Discord via webhook
             await sendDollOrderNotification({
                 nickname,
+                contact,
                 title,
                 headpieceCraft,
                 totalPrice,
@@ -265,6 +268,10 @@ const AdoptionWizardPage: React.FC = () => {
                             <div>
                                 <label className="block font-bold text-siam-dark mb-1">委託人暱稱 *</label>
                                 <input type="text" required value={nickname} onChange={e => setNickname(e.target.value)} className="w-full p-3 rounded-lg border focus:ring-2 focus:ring-siam-blue outline-none" placeholder="請務必記住，之後以暱稱做查詢及聯繫" />
+                            </div>
+                            <div>
+                                <label className="block font-bold text-siam-dark mb-1">聯絡方式（FB/Discord） *</label>
+                                <input type="text" required value={contact} onChange={e => setContact(e.target.value)} className="w-full p-3 rounded-lg border focus:ring-2 focus:ring-siam-blue outline-none" placeholder="範例：Discord:1234567" />
                             </div>
                             <div>
                                 <label className="block font-bold text-siam-dark mb-1">委託內容（一套外觀一單） *</label>

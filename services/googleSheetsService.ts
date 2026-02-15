@@ -29,6 +29,7 @@ export const syncOrderToGoogleSheet = async (order: Partial<DollOrder | BadgeOrd
                 : new Date((order.createdAt as any)).toLocaleString())
             : new Date().toLocaleString(),
         nickname: order.nickname,
+        contact: (order as any).contact || '', // 新增聯絡方式
         // 處理 DollOrder (title) 與 BadgeOrder (productTitle) 的欄位差異
         title: type === 'doll' ? (order as DollOrder).title : (order as BadgeOrder).productTitle,
         // 處理 DollOrder (totalPrice) 與 BadgeOrder (price) 的欄位差異

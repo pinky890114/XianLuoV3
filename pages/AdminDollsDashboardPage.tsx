@@ -26,6 +26,7 @@ const AdminDollsDashboardPage: React.FC = () => {
     const [newImage, setNewImage] = useState<File | null>(null);
     const [editingPrice, setEditingPrice] = useState<number | ''>('');
     const [editingRemarks, setEditingRemarks] = useState('');
+    const [editingContact, setEditingContact] = useState('');
     
     const [adminMessageInput, setAdminMessageInput] = useState('');
     const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -33,6 +34,7 @@ const AdminDollsDashboardPage: React.FC = () => {
 
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
     const [newOrderNickname, setNewOrderNickname] = useState('');
+    const [newOrderContact, setNewOrderContact] = useState('');
     const [newOrderTitle, setNewOrderTitle] = useState('');
     const [newOrderPrice, setNewOrderPrice] = useState<number | ''>('');
     const [newOrderHeadpieceCraft, setNewOrderHeadpieceCraft] = useState<HeadpieceCraft>(HeadpieceCraft.INTEGRATED);
@@ -239,6 +241,7 @@ const AdminDollsDashboardPage: React.FC = () => {
         setNewStatus(order.status);
         setEditingPrice(order.totalPrice);
         setEditingRemarks(order.remarks);
+        setEditingContact(order.contact || '');
         setAdminMessageInput('');
         setIsEditModalOpen(true);
     };
@@ -250,6 +253,7 @@ const AdminDollsDashboardPage: React.FC = () => {
         setNewStatus(null);
         setEditingPrice('');
         setEditingRemarks('');
+        setEditingContact('');
         setAdminMessageInput('');
     };
 
@@ -257,6 +261,7 @@ const AdminDollsDashboardPage: React.FC = () => {
     const closeNewOrderModal = () => {
         setIsNewOrderModalOpen(false);
         setNewOrderNickname('');
+        setNewOrderContact('');
         setNewOrderTitle('');
         setNewOrderPrice('');
         setNewOrderHeadpieceCraft(HeadpieceCraft.INTEGRATED);
@@ -266,8 +271,8 @@ const AdminDollsDashboardPage: React.FC = () => {
     };
 
     const handleCreateOrder = async () => {
-        if (!newOrderNickname || !newOrderTitle || !newOrderImages || newOrderPrice === '') {
-            setInfoModalState({ title: '資料不完整', message: '請填寫暱稱、委託標題、總金額並上傳說明圖！' });
+        if (!newOrderNickname || !newOrderContact || !newOrderTitle || !newOrderImages || newOrderPrice === '') {
+            setInfoModalState({ title: '資料不完整', message: '請填寫暱稱、聯絡方式、委託標題、總金額並上傳說明圖！' });
             return;
         }
         setIsUpdating(true);
@@ -276,7 +281,9 @@ const AdminDollsDashboardPage: React.FC = () => {
             const imageUrls = await Promise.all(uploadPromises);
             const newOrderData = {
                 orderId: `NOCY-${Date.now().toString().slice(-6)}`,
-                nickname: newOrderNickname, title: newOrderTitle,
+                nickname: newOrderNickname, 
+                contact: newOrderContact,
+                title: newOrderTitle,
                 totalPrice: Number(newOrderPrice), status: OrderStatus.ACCEPTED,
                 headpieceCraft: newOrderHeadpieceCraft, referenceImageUrls: imageUrls,
                 remarks: newOrderRemarks || '由管理員手動建立',
@@ -321,6 +328,7 @@ const AdminDollsDashboardPage: React.FC = () => {
             if (newStatus && newStatus !== selectedOrder.status) updates.status = newStatus;
             if (editingPrice !== '' && Number(editingPrice) !== selectedOrder.totalPrice) updates.totalPrice = Number(editingPrice);
             if (editingRemarks !== selectedOrder.remarks) updates.remarks = editingRemarks;
+            if (editingContact !== selectedOrder.contact) updates.contact = editingContact;
             
             if (newImage) {
                 updates.progressImageUrls = arrayUnion(await uploadAndCompressImage(newImage, 'progress-images', 'progress'));
@@ -328,9 +336,8 @@ const AdminDollsDashboardPage: React.FC = () => {
 
             if (Object.keys(updates).length > 0) {
                  await updateDoc(doc(db, 'dollOrders', selectedOrder.id), updates);
-                 if (updates.status || updates.totalPrice || updates.remarks) {
-                     await syncOrderToGoogleSheet({ ...selectedOrder, ...updates });
-                 }
+                 // Need to sync contact if changed
+                 await syncOrderToGoogleSheet({ ...selectedOrder, ...updates });
             }
             await fetchOrders();
             closeEditModal();
@@ -458,6 +465,11 @@ const AdminDollsDashboardPage: React.FC = () => {
                         </div>
 
                         <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">聯絡方式</label>
+                            <input type="text" value={editingContact} onChange={(e) => setEditingContact(e.target.value)} className="w-full p-2 border rounded" placeholder="聯絡方式" />
+                        </div>
+
+                        <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">總金額</label>
                             <input type="number" value={editingPrice} onChange={(e) => setEditingPrice(Number(e.target.value))} className="w-full p-2 border rounded" />
                         </div>
@@ -517,7 +529,58 @@ const AdminDollsDashboardPage: React.FC = () => {
                  </div>
             </Modal>)}
 
-            <Modal isOpen={isNewOrderModalOpen} onClose={closeNewOrderModal} title="新增訂單">{/* ... existing new order modal content ... */}</Modal>
+            <Modal isOpen={isNewOrderModalOpen} onClose={closeNewOrderModal} title="新增訂單">
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">暱稱 *</label>
+                        <input type="text" value={newOrderNickname} onChange={e => setNewOrderNickname(e.target.value)} className="w-full p-2 border rounded focus:ring-2 focus:ring-siam-blue outline-none" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">聯絡方式 *</label>
+                        <input type="text" value={newOrderContact} onChange={e => setNewOrderContact(e.target.value)} className="w-full p-2 border rounded focus:ring-2 focus:ring-siam-blue outline-none" placeholder="Discord / FB" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">委託標題 *</label>
+                        <input type="text" value={newOrderTitle} onChange={e => setNewOrderTitle(e.target.value)} className="w-full p-2 border rounded focus:ring-2 focus:ring-siam-blue outline-none" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">總金額 *</label>
+                        <input type="number" value={newOrderPrice} onChange={e => setNewOrderPrice(e.target.value ? Number(e.target.value) : '')} className="w-full p-2 border rounded focus:ring-2 focus:ring-siam-blue outline-none" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">頭飾工藝</label>
+                        <select value={newOrderHeadpieceCraft} onChange={e => setNewOrderHeadpieceCraft(e.target.value as HeadpieceCraft)} className="w-full p-2 border rounded bg-white">
+                            <option value={HeadpieceCraft.INTEGRATED}>{HeadpieceCraft.INTEGRATED}</option>
+                            <option value={HeadpieceCraft.DETACHABLE}>{HeadpieceCraft.DETACHABLE}</option>
+                            <option value={HeadpieceCraft.CLIPON}>{HeadpieceCraft.CLIPON}</option>
+                            <option value={HeadpieceCraft.NONE}>{HeadpieceCraft.NONE}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">參考圖/說明圖 *</label>
+                        <input type="file" multiple accept="image/*" onChange={e => setNewOrderImages(e.target.files)} className="w-full text-sm" />
+                    </div>
+                    <div>
+                         <label className="block text-sm font-bold text-gray-700 mb-1">加購項目</label>
+                         <div className="grid grid-cols-2 gap-2 text-xs border p-2 rounded">
+                            {DOLL_ADDONS.map(addon => (
+                                <label key={addon.id} className="flex items-center space-x-2">
+                                    <input type="checkbox" checked={newOrderAddons.has(addon.id)} onChange={() => handleAddonToggle(addon.id)} />
+                                    <span>{addon.name}</span>
+                                </label>
+                            ))}
+                         </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">備註</label>
+                        <textarea value={newOrderRemarks} onChange={e => setNewOrderRemarks(e.target.value)} className="w-full p-2 border rounded" rows={2}></textarea>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                        <button onClick={closeNewOrderModal} className="px-4 py-2 bg-gray-100 rounded">取消</button>
+                        <button onClick={handleCreateOrder} disabled={isUpdating} className="px-6 py-2 bg-siam-blue text-white rounded font-bold">{isUpdating ? <LoadingSpinner /> : '建立訂單'}</button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* ... Info and Confirm modals ... */}
              {infoModalState && (

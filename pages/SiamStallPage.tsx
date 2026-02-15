@@ -23,15 +23,15 @@ interface SpecCardProps {
 const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate, onInputChange }) => {
     return (
         <div className={`flex items-center justify-between p-3 rounded-lg border transition-all ${qty > 0 ? 'bg-siam-cream border-siam-brown ring-1 ring-siam-brown/20' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-center overflow-hidden">
+            <div className="flex items-center flex-1">
                 <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-14 h-14 rounded object-cover mr-3 flex-shrink-0" />
                 <div className="text-left min-w-0">
-                    <p className="font-bold text-siam-dark truncate pr-2">{spec.specName}</p>
+                    <p className="font-bold text-siam-dark pr-2 leading-tight break-words whitespace-pre-wrap">{spec.specName}</p>
                     <p className="text-sm text-siam-blue">${spec.price}</p>
                 </div>
             </div>
             
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                 <button 
                     onClick={() => onUpdate(productId, idx, -1)}
                     className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold"
@@ -67,6 +67,7 @@ const SiamStallPage: React.FC = () => {
 
     // Form states
     const [nickname, setNickname] = useState('');
+    const [contact, setContact] = useState('');
     const [remarks, setRemarks] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submittedOrderId, setSubmittedOrderId] = useState('');
@@ -131,12 +132,7 @@ const SiamStallPage: React.FC = () => {
     }, [viewingSeries]);
 
     // Calculate Cart Totals
-    // Fixed: Added explicit generic to useMemo to ensure TypeScript correctly infers the returned object properties as non-unknown
-    const { totalPrice, totalItems, cartDetails } = useMemo<{
-        totalPrice: number;
-        totalItems: number;
-        cartDetails: string[];
-    }>(() => {
+    const cartSummary = useMemo(() => {
         let price = 0;
         let items = 0;
         const details: string[] = [];
@@ -164,6 +160,8 @@ const SiamStallPage: React.FC = () => {
             cartDetails: details,
         };
     }, [cart, products]);
+
+    const { totalPrice, totalItems, cartDetails } = cartSummary;
 
     const updateCart = (productId: string, specIndex: number, delta: number) => {
         const key = `${productId}_${specIndex}`;
@@ -198,6 +196,7 @@ const SiamStallPage: React.FC = () => {
         setCart({});
         setStep(1);
         setNickname('');
+        setContact('');
         setRemarks('');
         setViewSeriesId('');
         setViewCat('');
@@ -205,7 +204,7 @@ const SiamStallPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!nickname || totalItems === 0) return;
+        if (!nickname || !contact || totalItems === 0) return;
 
         setIsSubmitting(true);
         try {
@@ -223,6 +222,7 @@ const SiamStallPage: React.FC = () => {
             const orderData: Omit<BadgeOrder, 'id'> = {
                 orderId,
                 nickname,
+                contact,
                 productTitle: fullContentString, 
                 price: totalPrice,
                 status: OrderStatus.QUANTITY_SURVEY,
@@ -242,6 +242,7 @@ const SiamStallPage: React.FC = () => {
             await sendBadgeOrderNotification({
                 orderId,
                 nickname,
+                contact,
                 productTitle: fullContentString,
                 price: totalPrice,
                 remarks: remarks
@@ -368,7 +369,7 @@ const SiamStallPage: React.FC = () => {
                                     groupedSpecs ? (
                                         // Render grouped specs
                                         <div className="space-y-6">
-                                            {Object.entries(groupedSpecs.groups).map(([styleName, items]) => (
+                                            {Object.entries(groupedSpecs.groups).map(([styleName, items]: [string, { spec: ProductSpec, originalIndex: number }[]]) => (
                                                 <div key={styleName} className="bg-gray-50 p-4 rounded-lg border border-gray-100">
                                                     <h3 className="font-bold text-lg text-siam-blue mb-3 border-b border-siam-blue/20 pb-1">{styleName}</h3>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -512,6 +513,15 @@ const SiamStallPage: React.FC = () => {
                                 type="text" required value={nickname} onChange={e => setNickname(e.target.value)}
                                 className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-siam-blue outline-none"
                                 placeholder="請輸入您的暱稱"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block font-bold text-siam-dark mb-2">聯絡方式（FB/Discord） *</label>
+                            <input 
+                                type="text" required value={contact} onChange={e => setContact(e.target.value)}
+                                className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-siam-blue outline-none"
+                                placeholder="範例：Discord:1234567"
                             />
                         </div>
 

@@ -96,6 +96,7 @@ export interface DollOrder {
     id: string;
     orderId: string;
     nickname: string;
+    contact: string; // 聯絡方式
     title: string;
     headpieceCraft: HeadpieceCraft;
     referenceImageUrls: string[];
@@ -132,6 +133,7 @@ export interface BadgeOrder {
     id: string;
     orderId: string;
     nickname: string;
+    contact: string; // 聯絡方式
     productTitle: string; // 完整名稱：[分類] 系列 - 規格
     price: number;
     status: OrderStatus;

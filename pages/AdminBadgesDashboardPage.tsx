@@ -42,6 +42,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
     const [selectedOrder, setSelectedOrder] = useState<BadgeOrder | null>(null);
     const [editingOrderPrice, setEditingOrderPrice] = useState<number | ''>('');
     const [editingOrderRemarks, setEditingOrderRemarks] = useState('');
+    const [editingContact, setEditingContact] = useState('');
     const [newOrderStatus, setNewOrderStatus] = useState<OrderStatus | null>(null);
     const [adminMessageInput, setAdminMessageInput] = useState('');
     const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -52,6 +53,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
     const [newOrderSeriesId, setNewOrderSeriesId] = useState('');
     const [newOrderSpecIndex, setNewOrderSpecIndex] = useState<number | null>(null);
     const [newOrderNickname, setNewOrderNickname] = useState('');
+    const [newOrderContact, setNewOrderContact] = useState('');
     const [newOrderPrice, setNewOrderPrice] = useState<number | ''>('');
     const [newOrderRemarks, setNewOrderRemarks] = useState('');
     const [newOrderStatusManual, setNewOrderStatusManual] = useState<OrderStatus>(OrderStatus.QUANTITY_SURVEY);
@@ -179,7 +181,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
             await addDoc(collection(db, 'products'), {
                 categoryId: newSeriesCategory,
                 seriesName: newSeriesName.trim(),
-                specs: [{ specName: '預設規格', price: 0, imageUrl: '', isActive: false }] // Default inactive
+                specs: [{ specName: '預設規格', price: 0, imageUrl: '', isActive: true }] // Default active
             });
             await fetchData();
             setIsAddSeriesModalOpen(false);
@@ -200,7 +202,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
         if (!editingProduct) return;
         setEditingProduct({
             ...editingProduct,
-            specs: [...editingProduct.specs, { specName: '新規格', price: 0, imageUrl: '', isActive: false }] // Default inactive
+            specs: [...editingProduct.specs, { specName: '新規格', price: 0, imageUrl: '', isActive: true }] // Default active
         });
     };
 
@@ -302,6 +304,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
         setSelectedOrder(order);
         setEditingOrderPrice(order.price);
         setEditingOrderRemarks(order.remarks);
+        setEditingContact(order.contact || '');
         setNewOrderStatus(order.status);
         setAdminMessageInput('');
         setIsOrderEditModalOpen(true);
@@ -315,6 +318,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
             if (newOrderStatus && newOrderStatus !== selectedOrder.status) updates.status = newOrderStatus;
             if (editingOrderPrice !== '' && Number(editingOrderPrice) !== selectedOrder.price) updates.price = Number(editingOrderPrice);
             if (editingOrderRemarks !== selectedOrder.remarks) updates.remarks = editingOrderRemarks;
+            if (editingContact !== selectedOrder.contact) updates.contact = editingContact;
 
             if (Object.keys(updates).length > 0) {
                  await updateDoc(doc(db, 'badgeOrders', selectedOrder.id), updates);
@@ -358,6 +362,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
         setNewOrderSeriesId('');
         setNewOrderSpecIndex(null);
         setNewOrderNickname('');
+        setNewOrderContact('');
         setNewOrderPrice('');
         setNewOrderRemarks('');
         setNewOrderStatusManual(OrderStatus.QUANTITY_SURVEY); // Default to first step
@@ -370,8 +375,8 @@ const AdminBadgesDashboardPage: React.FC = () => {
     };
 
     const handleCreateOrder = async () => {
-        if (!newOrderNickname || newOrderPrice === '' || !newOrderSeriesId || newOrderSpecIndex === null) {
-            setInfoModalState({ title: '提示', message: '請完整填寫：暱稱、商品規格與價格' });
+        if (!newOrderNickname || !newOrderContact || newOrderPrice === '' || !newOrderSeriesId || newOrderSpecIndex === null) {
+            setInfoModalState({ title: '提示', message: '請完整填寫：暱稱、聯絡方式、商品規格與價格' });
             return;
         }
 
@@ -390,6 +395,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
             const orderData: Omit<BadgeOrder, 'id'> = {
                 orderId,
                 nickname: newOrderNickname,
+                contact: newOrderContact,
                 productTitle,
                 price: Number(newOrderPrice),
                 status: newOrderStatusManual, 
@@ -405,6 +411,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
             setInfoModalState({ title: '成功', message: '補單成功！' });
             
             setNewOrderNickname('');
+            setNewOrderContact('');
             setNewOrderRemarks('');
             setNewOrderSpecIndex(null);
             setNewOrderSeriesId('');
@@ -599,6 +606,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                         <input type="text" value={newOrderNickname} onChange={e => setNewOrderNickname(e.target.value)} className="w-full p-2 border rounded" placeholder="暱稱" />
+                        <input type="text" value={newOrderContact} onChange={e => setNewOrderContact(e.target.value)} className="w-full p-2 border rounded" placeholder="聯絡方式" />
                         <input type="number" value={newOrderPrice} onChange={e => setNewOrderPrice(e.target.value ? Number(e.target.value) : '')} className="w-full p-2 border rounded" placeholder="價格" />
                         <select value={newOrderStatusManual} onChange={e => setNewOrderStatusManual(e.target.value as OrderStatus)} className="w-full p-2 border rounded bg-white">
                              {/* Only Badge Statuses */}
@@ -696,6 +704,12 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                 <label className="block text-sm font-bold text-gray-700 mb-1">總金額</label>
                                 <input type="number" value={editingOrderPrice} onChange={(e) => setEditingOrderPrice(Number(e.target.value))} className="w-full p-2 border rounded" />
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">聯絡方式</label>
+                                <input type="text" value={editingContact} onChange={(e) => setEditingContact(e.target.value)} className="w-full p-2 border rounded" placeholder="聯絡方式" />
+                            </div>
+
                             <div className="col-span-1 md:col-span-2">
                                 <label className="block text-sm font-bold text-gray-700 mb-1">備註</label>
                                 <textarea value={editingOrderRemarks} onChange={(e) => setEditingOrderRemarks(e.target.value)} className="w-full p-2 border rounded" rows={2} />

@@ -46,6 +46,7 @@ export const sendDollOrderNotification = async (order: Omit<DollOrder, 'id' | 'o
         fields: [
             { name: '🧾 訂單編號', value: order.orderId || '處理中...', inline: true },
             { name: '📋 委託標題', value: order.title, inline: true },
+            { name: '📞 聯絡方式', value: order.contact, inline: true },
             { name: '💰 預估金額', value: `NT$ ${order.totalPrice}`, inline: true },
             { name: '🎀 頭飾工藝', value: order.headpieceCraft, inline: true },
             { name: '🛒 加購項目', value: addonsText, inline: false },
@@ -70,6 +71,7 @@ export const sendBadgeOrderNotification = async (order: Omit<BadgeOrder, 'id' | 
         fields: [
             { name: '🧾 訂單編號', value: order.orderId, inline: true },
             { name: '💰 總金額', value: `NT$ ${order.price}`, inline: true },
+            { name: '📞 聯絡方式', value: order.contact, inline: true },
             { name: '📦 委託內容', value: `\`\`\`${order.productTitle}\`\`\``, inline: false },
             { name: '📝 備註', value: order.remarks || '無', inline: false },
         ],

@@ -250,6 +250,10 @@ const OrderStatusPage: React.FC = () => {
                                     <span className="font-bold text-siam-blue">總金額：</span>
                                     <span className="text-siam-brown">NT$ {price}</span>
                                 </div>
+                                <div className="md:col-span-2">
+                                    <span className="font-bold text-siam-blue">聯絡方式：</span>
+                                    <span className="text-siam-brown font-mono">{(order as any).contact || '未填寫'}</span>
+                                </div>
                                 {isDoll && (
                                     <div className="md:col-span-2">
                                         <span className="font-bold text-siam-blue">加價購項目：</span>

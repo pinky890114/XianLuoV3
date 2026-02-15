@@ -78,7 +78,7 @@ function App() {
   return (
     <HashRouter>
       <ScrollToTop />
-      <div className="min-h-screen flex flex-col font-sans text-siam-brown">
+      <div className="min-h-screen flex flex-col font-sans text-siam-brown overflow-x-hidden">
         <main className="flex-grow">
           <Routes>
             {/* Public Routes */}

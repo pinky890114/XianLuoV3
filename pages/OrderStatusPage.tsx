@@ -173,19 +173,19 @@ const OrderStatusPage: React.FC = () => {
                     ].sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
 
                     return (
-                    <div key={order.id} className="bg-white/50 p-6 rounded-lg shadow-md border-t-4 border-siam-blue">
+                    <div key={order.id} className="bg-white/50 p-4 md:p-6 rounded-lg shadow-md border-t-4 border-siam-blue">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-                            <div>
+                            <div className="w-full">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className={`text-xs px-2 py-0.5 rounded-full text-white ${isDoll ? 'bg-purple-600' : 'bg-teal-600'}`}>
                                         {isDoll ? '小餅訂單' : '地攤訂單'}
                                     </span>
                                     <span className="font-mono bg-white px-2 py-0.5 rounded text-sm">{order.orderId}</span>
                                 </div>
-                                <h2 className="text-2xl font-bold text-siam-dark">{title}</h2>
-                                <p className="text-sm text-siam-brown mt-1">暱稱: <span className="font-bold">{order.nickname}</span></p>
+                                <h2 className="text-2xl font-bold text-siam-dark break-words">{title}</h2>
+                                <p className="text-sm text-siam-brown mt-1">暱稱: <span className="font-bold break-all">{order.nickname}</span></p>
                             </div>
-                            <div className="mt-2 md:mt-0 text-xl font-bold text-siam-cream bg-siam-blue px-4 py-1 rounded-full shadow-sm">
+                            <div className="mt-2 md:mt-0 text-xl font-bold text-siam-cream bg-siam-blue px-4 py-1 rounded-full shadow-sm whitespace-nowrap self-start md:self-auto">
                                 {normalizeStatus(order.status)}
                             </div>
                         </div>
@@ -252,17 +252,17 @@ const OrderStatusPage: React.FC = () => {
                                 </div>
                                 <div className="md:col-span-2">
                                     <span className="font-bold text-siam-blue">聯絡方式：</span>
-                                    <span className="text-siam-brown font-mono">{(order as any).contact || '未填寫'}</span>
+                                    <span className="text-siam-brown font-mono break-all">{(order as any).contact || '未填寫'}</span>
                                 </div>
                                 {isDoll && (
                                     <div className="md:col-span-2">
                                         <span className="font-bold text-siam-blue">加價購項目：</span>
-                                        <span className="text-siam-brown">{dollOrder!.addons && dollOrder!.addons.length > 0 ? dollOrder!.addons.map(a => a.name).join('、') : '無'}</span>
+                                        <span className="text-siam-brown break-words">{dollOrder!.addons && dollOrder!.addons.length > 0 ? dollOrder!.addons.map(a => a.name).join('、') : '無'}</span>
                                     </div>
                                 )}
                                 <div className="md:col-span-2">
                                     <span className="font-bold text-siam-blue">備註：</span>
-                                    <p className="text-siam-brown whitespace-pre-wrap mt-1 bg-white/50 p-2 rounded">{order.remarks || '無'}</p>
+                                    <p className="text-siam-brown whitespace-pre-wrap mt-1 bg-white/50 p-2 rounded break-words">{order.remarks || '無'}</p>
                                 </div>
                             </div>
                         </div>
@@ -299,7 +299,7 @@ const OrderStatusPage: React.FC = () => {
                                                             <span>{msg.sender === 'customer' ? '我' : '掌櫃'}</span>
                                                             <span>{new Date(msg.timestamp.toMillis()).toLocaleString()}</span>
                                                         </p>
-                                                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                                                        <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
                                                     </div>
                                                 </div>
                                             ))}
@@ -344,7 +344,7 @@ const OrderStatusPage: React.FC = () => {
                                                         <span>{msg.sender === 'customer' ? '我' : '掌櫃'}</span>
                                                         <span>{new Date(msg.timestamp.toMillis()).toLocaleString()}</span>
                                                     </p>
-                                                    <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                                                    <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
                                                 </div>
                                             </div>
                                         ))}

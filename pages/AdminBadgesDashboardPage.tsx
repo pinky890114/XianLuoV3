@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, doc, addDoc, updateDoc, deleteDoc, writeBatch, Timestamp, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
@@ -18,6 +18,10 @@ const AdminBadgesDashboardPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'products' | 'orders'>('products');
     
+    // Search and Filter States for Orders
+    const [filterKeyword, setFilterKeyword] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+
     // UI states
     const [isProductEditModalOpen, setIsProductEditModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -46,6 +50,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
     const [newOrderStatus, setNewOrderStatus] = useState<OrderStatus | null>(null);
     const [adminMessageInput, setAdminMessageInput] = useState('');
     const [isSendingMessage, setIsSendingMessage] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // New Order (Manual Entry) States
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
@@ -67,7 +72,13 @@ const AdminBadgesDashboardPage: React.FC = () => {
 
             const oSnap = await getDocs(query(collection(db, 'badgeOrders')));
             const oList = oSnap.docs.map(d => ({ id: d.id, ...d.data() } as BadgeOrder));
-            oList.sort((a, b) => (b.orderId > a.orderId ? 1 : -1));
+            oList.sort((a, b) => {
+                 // Sort by createdAt desc if available, otherwise by orderId desc
+                 const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+                 const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+                 if (timeA !== timeB) return timeB - timeA;
+                 return b.orderId > a.orderId ? 1 : -1;
+            });
             setOrders(oList);
             setSelectedOrderIds(new Set());
 
@@ -122,6 +133,29 @@ const AdminBadgesDashboardPage: React.FC = () => {
     };
 
     useEffect(() => { fetchData(); }, [fetchData]);
+    
+    useEffect(() => {
+        if (isOrderEditModalOpen && messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [isOrderEditModalOpen, selectedOrder]);
+
+    // Derived state for filtering
+    const filteredOrders = useMemo(() => {
+        return orders.filter(order => {
+            const matchesKeyword = 
+                filterKeyword === '' || 
+                order.orderId.toLowerCase().includes(filterKeyword.toLowerCase()) ||
+                order.nickname.toLowerCase().includes(filterKeyword.toLowerCase()) ||
+                (order.productTitle && order.productTitle.toLowerCase().includes(filterKeyword.toLowerCase()));
+            
+            const matchesStatus = 
+                filterStatus === '' || 
+                order.status === filterStatus;
+
+            return matchesKeyword && matchesStatus;
+        });
+    }, [orders, filterKeyword, filterStatus]);
 
     // --- Product Management Logic ---
 
@@ -242,7 +276,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
     // --- Order Batch Operations ---
 
     const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSelectedOrderIds(e.target.checked ? new Set(orders.map(o => o.id)) : new Set());
+        setSelectedOrderIds(e.target.checked ? new Set(filteredOrders.map(o => o.id)) : new Set());
     };
 
     const toggleSelectOrder = (id: string) => {
@@ -505,11 +539,42 @@ const AdminBadgesDashboardPage: React.FC = () => {
             ) : (
                 /* ... Order Tab ... */
                 <div className="bg-white rounded-xl shadow border p-6">
+                    {/* Search and Filter Section */}
+                    <div className="mb-6 flex flex-col md:flex-row gap-4">
+                        <div className="flex-1">
+                            <input 
+                                type="text" 
+                                placeholder="搜尋訂單編號、暱稱或商品名稱..." 
+                                value={filterKeyword}
+                                onChange={(e) => setFilterKeyword(e.target.value)}
+                                className="w-full p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-blue outline-none"
+                            />
+                        </div>
+                        <div className="w-full md:w-64">
+                            <select 
+                                value={filterStatus} 
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                className="w-full p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-blue outline-none bg-white"
+                            >
+                                <option value="">全部狀態</option>
+                                {BadgeOrderStatusArray.map(status => (
+                                    <option key={status} value={status}>{status}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <button 
+                            onClick={() => { setFilterKeyword(''); setFilterStatus(''); }}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors whitespace-nowrap"
+                        >
+                            重置篩選
+                        </button>
+                    </div>
+
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-siam-blue">
                             <thead className="bg-siam-blue/10">
                                 <tr>
-                                    <th className="px-4 py-3 w-10"><input type="checkbox" className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer" checked={selectedOrderIds.size === orders.length && orders.length > 0} onChange={toggleSelectAll} /></th>
+                                    <th className="px-4 py-3 w-10"><input type="checkbox" className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer" checked={selectedOrderIds.size === filteredOrders.length && filteredOrders.length > 0} onChange={toggleSelectAll} /></th>
                                     <th className="py-3 px-2 text-left font-bold text-siam-dark">編號</th>
                                     <th className="py-3 px-2 text-left font-bold text-siam-dark">暱稱</th>
                                     <th className="py-3 px-2 text-left font-bold text-siam-dark w-1/3">訂單內容</th>
@@ -519,18 +584,25 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-100">
-                                {orders.map(o => (
-                                    <tr key={o.id} className={selectedOrderIds.has(o.id) ? 'bg-blue-50' : ''}>
-                                        <td className="px-4 py-4 w-10"><input type="checkbox" className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer" checked={selectedOrderIds.has(o.id)} onChange={() => toggleSelectOrder(o.id)} /></td>
-                                        <td className="py-4 px-2 font-mono text-xs text-siam-brown">{o.orderId}</td>
-                                        <td className="py-4 px-2 font-bold text-siam-dark">{o.nickname}</td>
-                                        <td className="py-4 px-2 text-sm text-gray-700 whitespace-pre-wrap">{o.productTitle}</td>
-                                        <td className="py-4 px-2 font-bold text-siam-blue">${o.price}</td>
-                                        <td className="py-4 px-2"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs whitespace-nowrap">{o.status}</span></td>
-                                        <td className="py-4 px-2"><button onClick={() => openOrderEditModal(o)} className="text-siam-blue font-bold text-sm hover:underline">查看/編輯</button></td>
+                                {filteredOrders.length > 0 ? (
+                                    filteredOrders.map(o => (
+                                        <tr key={o.id} className={selectedOrderIds.has(o.id) ? 'bg-blue-50' : ''}>
+                                            <td className="px-4 py-4 w-10"><input type="checkbox" className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer" checked={selectedOrderIds.has(o.id)} onChange={() => toggleSelectOrder(o.id)} /></td>
+                                            <td className="py-4 px-2 font-mono text-xs text-siam-brown">{o.orderId}</td>
+                                            <td className="py-4 px-2 font-bold text-siam-dark">{o.nickname}</td>
+                                            <td className="py-4 px-2 text-sm text-gray-700 whitespace-pre-wrap">{o.productTitle}</td>
+                                            <td className="py-4 px-2 font-bold text-siam-blue">${o.price}</td>
+                                            <td className="py-4 px-2"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs whitespace-nowrap">{o.status}</span></td>
+                                            <td className="py-4 px-2"><button onClick={() => openOrderEditModal(o)} className="text-siam-blue font-bold text-sm hover:underline">查看/編輯</button></td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={7} className="py-10 text-center text-gray-400">
+                                            沒有符合條件的訂單
+                                        </td>
                                     </tr>
-                                ))}
-                                {orders.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-gray-400">目前沒有訂單</td></tr>}
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -539,7 +611,6 @@ const AdminBadgesDashboardPage: React.FC = () => {
 
             {/* ... Add Series Modal ... */}
             <Modal isOpen={isAddSeriesModalOpen} onClose={() => setIsAddSeriesModalOpen(false)} title={`在 [${newSeriesCategory}] 新增系列`}>
-                {/* ... content same as before ... */}
                  <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">系列名稱</label>
@@ -564,7 +635,6 @@ const AdminBadgesDashboardPage: React.FC = () => {
             {/* ... Manual Order Modal ... */}
             <Modal isOpen={isNewOrderModalOpen} onClose={() => setIsNewOrderModalOpen(false)} title="手動新增訂單 (補單)" maxWidth="max-w-4xl">
                  <div className="space-y-6">
-                    {/* ... Step 1, 2, 3 ... same as before */}
                      <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">1. 選擇類別</label>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -614,7 +684,6 @@ const AdminBadgesDashboardPage: React.FC = () => {
             {/* ... Product Edit Modal ... */}
             {editingProduct && (
                 <Modal isOpen={isProductEditModalOpen} onClose={() => setIsProductEditModalOpen(false)} title="編輯商品系列" maxWidth="max-w-4xl">
-                     {/* ... Same as before ... */}
                      <div className="space-y-6">
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-2">系列名稱</label>
@@ -714,45 +783,77 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                 <label className="block text-sm font-bold text-gray-700 mb-1">總金額</label>
                                 <input type="number" value={editingOrderPrice} onChange={(e) => setEditingOrderPrice(Number(e.target.value))} className="w-full p-2 border rounded" />
                             </div>
-
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">聯絡方式</label>
-                                <input type="text" value={editingContact} onChange={(e) => setEditingContact(e.target.value)} className="w-full p-2 border rounded" placeholder="聯絡方式" />
+                                <input type="text" value={editingContact} onChange={(e) => setEditingContact(e.target.value)} className="w-full p-2 border rounded" />
                             </div>
-
-                            <div className="col-span-1 md:col-span-2">
+                            <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">備註</label>
-                                <textarea value={editingOrderRemarks} onChange={(e) => setEditingOrderRemarks(e.target.value)} className="w-full p-2 border rounded" rows={2} />
+                                <input type="text" value={editingOrderRemarks} onChange={(e) => setEditingOrderRemarks(e.target.value)} className="w-full p-2 border rounded" />
                             </div>
                             <div className="col-span-1 md:col-span-2 flex justify-end">
-                                <button onClick={handleUpdateOrder} disabled={isUpdating} className="bg-siam-blue text-white py-2 px-6 rounded font-bold shadow hover:bg-siam-dark text-sm">
-                                    {isUpdating ? <LoadingSpinner /> : '儲存訂單變更'}
-                                </button>
+                                <button onClick={handleUpdateOrder} disabled={isUpdating} className="bg-siam-blue text-white px-4 py-2 rounded font-bold">{isUpdating ? <LoadingSpinner /> : '儲存修改'}</button>
                             </div>
                         </div>
-                        <div className="flex flex-col flex-grow min-h-0 border-t pt-4 mt-2">
-                            <h3 className="font-bold text-siam-dark mb-2">即時對話 / 備註</h3>
-                            <div className="flex-grow bg-white border rounded-lg p-3 overflow-y-auto mb-3 space-y-3">
-                                {(selectedOrder.messages || []).sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis()).map((msg, idx) => (
-                                    <div key={idx} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`p-2 max-w-[85%] rounded-lg text-sm ${msg.sender === 'admin' ? 'bg-siam-blue text-white rounded-tr-none' : 'bg-gray-100 border border-gray-200 rounded-tl-none'}`}>
-                                            <p className="text-xs opacity-75 mb-1">{msg.sender === 'admin' ? '管理員' : '客戶'} - {new Date(msg.timestamp.toMillis()).toLocaleString()}</p>
-                                            <p>{msg.text}</p>
+
+                        <div className="flex-grow flex flex-col mt-4 border-t pt-4 min-h-0">
+                            <h3 className="font-bold text-siam-dark mb-2">對話紀錄</h3>
+                            <div className="flex-grow bg-white border rounded p-4 overflow-y-auto space-y-3 mb-3" ref={messagesEndRef}>
+                                {selectedOrder.messages && selectedOrder.messages.length > 0 ? (
+                                    selectedOrder.messages.map((msg, idx) => (
+                                        <div key={idx} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`p-2 max-w-[80%] rounded-lg text-sm ${msg.sender === 'admin' ? 'bg-siam-blue text-white' : 'bg-gray-100 border'}`}>
+                                                <p className="text-xs opacity-70 mb-1">{msg.sender === 'admin' ? '管理員' : '客戶'} - {new Date(msg.timestamp.toMillis()).toLocaleString()}</p>
+                                                <p className="whitespace-pre-wrap">{msg.text}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                                {(!selectedOrder.messages || selectedOrder.messages.length === 0) && <p className="text-center text-gray-400 text-sm mt-10">尚無對話</p>}
+                                    ))
+                                ) : (
+                                    <p className="text-center text-gray-400 mt-4">尚無對話</p>
+                                )}
                             </div>
                             <div className="flex gap-2">
-                                <input type="text" value={adminMessageInput} onChange={(e) => setAdminMessageInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSendAdminMessage()} placeholder="輸入訊息..." className="flex-grow p-2 border rounded text-sm" />
-                                <button onClick={handleSendAdminMessage} disabled={isSendingMessage || !adminMessageInput.trim()} className="bg-siam-brown text-white px-4 py-2 rounded text-sm whitespace-nowrap">發送</button>
+                                <input 
+                                    type="text" 
+                                    value={adminMessageInput} 
+                                    onChange={(e) => setAdminMessageInput(e.target.value)} 
+                                    onKeyPress={(e) => e.key === 'Enter' && handleSendAdminMessage()}
+                                    className="flex-grow p-2 border rounded" 
+                                    placeholder="輸入訊息..." 
+                                />
+                                <button onClick={handleSendAdminMessage} disabled={isSendingMessage || !adminMessageInput.trim()} className="bg-siam-brown text-white px-4 py-2 rounded">發送</button>
                             </div>
                         </div>
                     </div>
                 </Modal>
             )}
 
-            {/* ... Batch Delete, Info, Confirm Modals ... */}
+            {/* Info Modal */}
+            {infoModalState && (
+                <Modal isOpen={!!infoModalState} onClose={() => setInfoModalState(null)} title={infoModalState.title}>
+                    <div className="p-4 space-y-4">
+                        <div className="text-siam-brown whitespace-pre-wrap">{infoModalState.message}</div>
+                        <div className="flex justify-end">
+                            <button onClick={() => setInfoModalState(null)} className="px-6 py-2 bg-siam-blue text-white rounded hover:bg-siam-dark">好的</button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Confirm Modal */}
+            {confirmModalState && (
+                <Modal isOpen={!!confirmModalState} onClose={() => setConfirmModalState(null)} title={confirmModalState.title}>
+                    <div className="p-4 space-y-6">
+                        <div className="text-siam-brown whitespace-pre-wrap">{confirmModalState.message}</div>
+                        <div className="flex justify-end space-x-3">
+                            <button onClick={() => setConfirmModalState(null)} className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded">取消</button>
+                            <button onClick={() => { confirmModalState.onConfirm(); setConfirmModalState(null); }} className="px-6 py-2 bg-siam-blue text-white rounded hover:bg-siam-dark">{confirmModalState.confirmText || '確認'}</button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+            
+            {/* Batch Delete Modal */}
              <Modal isOpen={isBatchDeleteModalOpen} onClose={() => setIsBatchDeleteModalOpen(false)} title="⚠️ 批次刪除確認">
                 <div className="space-y-4">
                     <div className="bg-red-50 border border-red-200 rounded p-4 text-red-700">
@@ -765,31 +866,10 @@ const AdminBadgesDashboardPage: React.FC = () => {
                     </div>
                     <div className="flex justify-end space-x-3 pt-2">
                         <button onClick={() => setIsBatchDeleteModalOpen(false)} className="px-4 py-2 text-gray-600 bg-gray-100 rounded">取消</button>
-                        <button onClick={executeBatchDelete} disabled={batchDeleteInput !== '確認刪除' || isUpdating} className="px-4 py-2 bg-red-600 text-white rounded flex items-center">{isUpdating ? <LoadingSpinner /> : '確認刪除'}</button>
+                        <button onClick={executeBatchDelete} disabled={batchDeleteInput.trim() !== '確認刪除' || isUpdating} className="px-4 py-2 bg-red-600 text-white rounded flex items-center">{isUpdating ? <LoadingSpinner /> : '確認刪除'}</button>
                     </div>
                 </div>
             </Modal>
-             {infoModalState && (
-                <Modal isOpen={!!infoModalState} onClose={() => setInfoModalState(null)} title={infoModalState.title}>
-                    <div className="p-4 space-y-4">
-                        <div className="text-siam-brown whitespace-pre-wrap">{infoModalState.message}</div>
-                        <div className="flex justify-end">
-                            <button onClick={() => setInfoModalState(null)} className="px-6 py-2 bg-siam-blue text-white rounded hover:bg-siam-dark">好的</button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
-            {confirmModalState && (
-                <Modal isOpen={!!confirmModalState} onClose={() => setConfirmModalState(null)} title={confirmModalState.title}>
-                    <div className="p-4 space-y-6">
-                        <div className="text-siam-brown whitespace-pre-wrap">{confirmModalState.message}</div>
-                        <div className="flex justify-end space-x-3">
-                            <button onClick={() => setConfirmModalState(null)} className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded">取消</button>
-                            <button onClick={() => { confirmModalState.onConfirm(); setConfirmModalState(null); }} className="px-6 py-2 bg-siam-blue text-white rounded hover:bg-siam-dark">{confirmModalState.confirmText || '確認'}</button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
         </div>
     );
 };

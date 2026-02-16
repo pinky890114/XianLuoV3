@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, doc, updateDoc, Timestamp, arrayUnion, addDoc, getDoc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
@@ -18,6 +18,10 @@ const AdminDollsDashboardPage: React.FC = () => {
     const [isShopOpen, setIsShopOpen] = useState(true);
     const [isTogglingShop, setIsTogglingShop] = useState(false);
     
+    // Search and Filter States
+    const [filterKeyword, setFilterKeyword] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+
     const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
     
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -93,6 +97,23 @@ const AdminDollsDashboardPage: React.FC = () => {
         fetchShopStatus();
     }, [fetchOrders, fetchShopStatus]);
 
+    // Derived state for filtering
+    const filteredOrders = useMemo(() => {
+        return orders.filter(order => {
+            const matchesKeyword = 
+                filterKeyword === '' || 
+                order.orderId.toLowerCase().includes(filterKeyword.toLowerCase()) ||
+                order.nickname.toLowerCase().includes(filterKeyword.toLowerCase()) ||
+                (order.title && order.title.toLowerCase().includes(filterKeyword.toLowerCase()));
+            
+            const matchesStatus = 
+                filterStatus === '' || 
+                order.status === filterStatus;
+
+            return matchesKeyword && matchesStatus;
+        });
+    }, [orders, filterKeyword, filterStatus]);
+
     useEffect(() => {
         if (isEditModalOpen && messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -115,7 +136,8 @@ const AdminDollsDashboardPage: React.FC = () => {
     };
     
     const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSelectedOrderIds(e.target.checked ? new Set(orders.map(o => o.id)) : new Set());
+        // Only select visible (filtered) orders
+        setSelectedOrderIds(e.target.checked ? new Set(filteredOrders.map(o => o.id)) : new Set());
     };
 
     const toggleSelectOrder = (id: string) => {
@@ -413,6 +435,37 @@ const AdminDollsDashboardPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Search and Filter Section */}
+            <div className="bg-white/50 p-4 rounded-lg shadow-sm mb-4 flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                    <input 
+                        type="text" 
+                        placeholder="搜尋訂單編號、暱稱或標題..." 
+                        value={filterKeyword}
+                        onChange={(e) => setFilterKeyword(e.target.value)}
+                        className="w-full p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-blue outline-none"
+                    />
+                </div>
+                <div className="w-full md:w-64">
+                    <select 
+                        value={filterStatus} 
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="w-full p-2 border border-siam-blue/30 rounded-md focus:ring-2 focus:ring-siam-blue outline-none bg-white"
+                    >
+                        <option value="">全部狀態</option>
+                        {DollOrderStatusArray.map(status => (
+                            <option key={status} value={status}>{status}</option>
+                        ))}
+                    </select>
+                </div>
+                <button 
+                    onClick={() => { setFilterKeyword(''); setFilterStatus(''); }}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors whitespace-nowrap"
+                >
+                    重置篩選
+                </button>
+            </div>
+
             <div className="bg-white/50 p-6 rounded-lg shadow-md">
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center p-8 text-center"><LoadingSpinner /><p className="mt-4 text-siam-dark font-semibold">正在讀取訂單資料...</p></div>
@@ -421,7 +474,7 @@ const AdminDollsDashboardPage: React.FC = () => {
                     <table className="min-w-full divide-y divide-siam-blue">
                         <thead className="bg-siam-blue/10">
                             <tr>
-                                <th className="px-4 py-3 w-10"><input type="checkbox" className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer" checked={selectedOrderIds.size === orders.length && orders.length > 0} onChange={toggleSelectAll} /></th>
+                                <th className="px-4 py-3 w-10"><input type="checkbox" className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer" checked={selectedOrderIds.size === filteredOrders.length && filteredOrders.length > 0} onChange={toggleSelectAll} /></th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-siam-dark uppercase tracking-wider">訂單編號</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-siam-dark uppercase tracking-wider">暱稱</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-siam-dark uppercase tracking-wider">標題</th>
@@ -431,17 +484,25 @@ const AdminDollsDashboardPage: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {orders.map(order => (
-                                <tr key={order.id} className={selectedOrderIds.has(order.id) ? 'bg-blue-50' : ''}>
-                                    <td className="px-4 py-4 w-10"><input type="checkbox" className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer" checked={selectedOrderIds.has(order.id)} onChange={() => toggleSelectOrder(order.id)} /></td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">{order.orderId}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-siam-dark">{order.nickname}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">{order.title}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">NT$ {order.totalPrice}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap"><span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{order.status === '已送達(委託完成)' ? '已送達' : order.status}</span></td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium"><button onClick={() => openEditModal(order)} className="text-siam-blue hover:text-siam-dark font-bold">查看/編輯</button></td>
+                            {filteredOrders.length > 0 ? (
+                                filteredOrders.map(order => (
+                                    <tr key={order.id} className={selectedOrderIds.has(order.id) ? 'bg-blue-50' : ''}>
+                                        <td className="px-4 py-4 w-10"><input type="checkbox" className="h-4 w-4 text-siam-blue rounded border-gray-300 focus:ring-siam-blue cursor-pointer" checked={selectedOrderIds.has(order.id)} onChange={() => toggleSelectOrder(order.id)} /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">{order.orderId}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-siam-dark">{order.nickname}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">{order.title}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">NT$ {order.totalPrice}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{order.status === '已送達(委託完成)' ? '已送達' : order.status}</span></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium"><button onClick={() => openEditModal(order)} className="text-siam-blue hover:text-siam-dark font-bold">查看/編輯</button></td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={7} className="px-6 py-10 text-center text-gray-500 italic">
+                                        沒有符合條件的訂單
+                                    </td>
                                 </tr>
-                            ))}
+                            )}
                         </tbody>
                     </table>
                     </div>
@@ -596,6 +657,7 @@ const AdminDollsDashboardPage: React.FC = () => {
                  </div>
             </Modal>)}
 
+            {/* ... New Order Modal ... */}
             <Modal isOpen={isNewOrderModalOpen} onClose={closeNewOrderModal} title="新增訂單">
                 <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
                     <div>

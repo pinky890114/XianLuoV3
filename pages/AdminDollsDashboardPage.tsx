@@ -32,6 +32,7 @@ const AdminDollsDashboardPage: React.FC = () => {
     const [editingPrice, setEditingPrice] = useState<number | ''>('');
     const [editingRemarks, setEditingRemarks] = useState('');
     const [editingContact, setEditingContact] = useState('');
+    const [editingRecipientName, setEditingRecipientName] = useState('');
     
     const [adminMessageInput, setAdminMessageInput] = useState('');
     const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -40,6 +41,7 @@ const AdminDollsDashboardPage: React.FC = () => {
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
     const [newOrderNickname, setNewOrderNickname] = useState('');
     const [newOrderContact, setNewOrderContact] = useState('');
+    const [newOrderRecipientName, setNewOrderRecipientName] = useState('');
     const [newOrderTitle, setNewOrderTitle] = useState('');
     const [newOrderPrice, setNewOrderPrice] = useState<number | ''>('');
     const [newOrderHeadpieceCraft, setNewOrderHeadpieceCraft] = useState<HeadpieceCraft>(HeadpieceCraft.INTEGRATED);
@@ -265,6 +267,7 @@ const AdminDollsDashboardPage: React.FC = () => {
         setEditingPrice(order.totalPrice);
         setEditingRemarks(order.remarks);
         setEditingContact(order.contact || '');
+        setEditingRecipientName(order.recipientName || '');
         setAdminMessageInput('');
         setIsEditModalOpen(true);
     };
@@ -278,6 +281,7 @@ const AdminDollsDashboardPage: React.FC = () => {
         setEditingPrice('');
         setEditingRemarks('');
         setEditingContact('');
+        setEditingRecipientName('');
         setAdminMessageInput('');
     };
 
@@ -286,6 +290,7 @@ const AdminDollsDashboardPage: React.FC = () => {
         setIsNewOrderModalOpen(false);
         setNewOrderNickname('');
         setNewOrderContact('');
+        setNewOrderRecipientName('');
         setNewOrderTitle('');
         setNewOrderPrice('');
         setNewOrderHeadpieceCraft(HeadpieceCraft.INTEGRATED);
@@ -295,8 +300,8 @@ const AdminDollsDashboardPage: React.FC = () => {
     };
 
     const handleCreateOrder = async () => {
-        if (!newOrderNickname || !newOrderContact || !newOrderTitle || !newOrderImages || newOrderPrice === '') {
-            setInfoModalState({ title: '資料不完整', message: '請填寫暱稱、聯絡方式、委託標題、總金額並上傳說明圖！' });
+        if (!newOrderNickname || !newOrderContact || !newOrderRecipientName || !newOrderTitle || !newOrderImages || newOrderPrice === '') {
+            setInfoModalState({ title: '資料不完整', message: '請填寫暱稱、聯絡方式、取貨姓名、委託標題、總金額並上傳說明圖！' });
             return;
         }
         setIsUpdating(true);
@@ -307,6 +312,7 @@ const AdminDollsDashboardPage: React.FC = () => {
                 orderId: `NOCY-${Date.now().toString().slice(-6)}`,
                 nickname: newOrderNickname, 
                 contact: newOrderContact,
+                recipientName: newOrderRecipientName,
                 title: newOrderTitle,
                 totalPrice: Number(newOrderPrice), status: OrderStatus.ACCEPTED,
                 headpieceCraft: newOrderHeadpieceCraft, referenceImageUrls: imageUrls,
@@ -353,6 +359,7 @@ const AdminDollsDashboardPage: React.FC = () => {
             if (editingPrice !== '' && Number(editingPrice) !== selectedOrder.totalPrice) updates.totalPrice = Number(editingPrice);
             if (editingRemarks !== selectedOrder.remarks) updates.remarks = editingRemarks;
             if (editingContact !== selectedOrder.contact) updates.contact = editingContact;
+            if (editingRecipientName !== selectedOrder.recipientName) updates.recipientName = editingRecipientName;
             
             // Upload progress images
             if (newImage) {
@@ -492,7 +499,7 @@ const AdminDollsDashboardPage: React.FC = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-siam-dark">{order.nickname}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">{order.title}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-siam-brown">NT$ {order.totalPrice}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap"><span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{order.status === '已送達(委託完成)' ? '已送達' : order.status}</span></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{(order.status as string) === '已送達(委託完成)' ? '已送達' : order.status}</span></td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium"><button onClick={() => openEditModal(order)} className="text-siam-blue hover:text-siam-dark font-bold">查看/編輯</button></td>
                                     </tr>
                                 ))
@@ -571,7 +578,7 @@ const AdminDollsDashboardPage: React.FC = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-sm font-bold text-gray-700">訂單狀態</label>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${selectedOrder.status === '已送達(委託完成)' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>{selectedOrder.status}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${(selectedOrder.status as string) === '已送達(委託完成)' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>{selectedOrder.status}</span>
                             </div>
                             <select 
                                 value={newStatus || ''} 
@@ -595,6 +602,11 @@ const AdminDollsDashboardPage: React.FC = () => {
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">聯絡方式</label>
                             <input type="text" value={editingContact} onChange={(e) => setEditingContact(e.target.value)} className="w-full p-2 border rounded" placeholder="聯絡方式" />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">取貨姓名</label>
+                            <input type="text" value={editingRecipientName} onChange={(e) => setEditingRecipientName(e.target.value)} className="w-full p-2 border rounded" placeholder="取貨姓名" />
                         </div>
 
                         <div>
@@ -667,6 +679,10 @@ const AdminDollsDashboardPage: React.FC = () => {
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">聯絡方式 *</label>
                         <input type="text" value={newOrderContact} onChange={e => setNewOrderContact(e.target.value)} className="w-full p-2 border rounded focus:ring-2 focus:ring-siam-blue outline-none" placeholder="Discord / FB" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">取貨姓名 *</label>
+                        <input type="text" value={newOrderRecipientName} onChange={e => setNewOrderRecipientName(e.target.value)} className="w-full p-2 border rounded focus:ring-2 focus:ring-siam-blue outline-none" />
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">委託標題 *</label>

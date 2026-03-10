@@ -92,6 +92,7 @@ const SiamStallPage: React.FC = () => {
     // Form states
     const [nickname, setNickname] = useState('');
     const [contact, setContact] = useState('');
+    const [recipientName, setRecipientName] = useState('');
     const [remarks, setRemarks] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submittedOrderId, setSubmittedOrderId] = useState('');
@@ -244,6 +245,7 @@ const SiamStallPage: React.FC = () => {
         setStep(1);
         setNickname('');
         setContact('');
+        setRecipientName('');
         setRemarks('');
         setViewSeriesId('');
         setViewCat('');
@@ -251,7 +253,7 @@ const SiamStallPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!nickname || !contact || totalItems === 0) return;
+        if (!nickname || !contact || !recipientName || totalItems === 0) return;
 
         setIsSubmitting(true);
         try {
@@ -270,6 +272,7 @@ const SiamStallPage: React.FC = () => {
                 orderId,
                 nickname,
                 contact,
+                recipientName,
                 productTitle: fullContentString, 
                 price: totalPrice,
                 status: OrderStatus.QUANTITY_SURVEY,
@@ -290,6 +293,7 @@ const SiamStallPage: React.FC = () => {
                 orderId,
                 nickname,
                 contact,
+                recipientName,
                 productTitle: fullContentString,
                 price: totalPrice,
                 remarks: remarks
@@ -413,7 +417,7 @@ const SiamStallPage: React.FC = () => {
 
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700 font-bold leading-relaxed">
                                     下面的價格都是台幣，以貼文時的匯率轉換計價方便參考，實際價格以收款時的匯率為準，
-                                    以上價格皆不包含運費、集運費和賣貨便運費 。
+                                    以上價格皆不包含均攤、運費、集運費和賣貨便運費 。
                                 </div>
                                 
                                 {hasAnySpecsToShow ? (
@@ -570,6 +574,15 @@ const SiamStallPage: React.FC = () => {
                                 type="text" required value={contact} onChange={e => setContact(e.target.value)}
                                 className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-siam-blue outline-none"
                                 placeholder="範例：Discord:1234567"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block font-bold text-siam-dark mb-2">賣貨便取貨姓名 *</label>
+                            <input 
+                                type="text" required value={recipientName} onChange={e => setRecipientName(e.target.value)}
+                                className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-siam-blue outline-none"
+                                placeholder="請輸入真實姓名，以便取貨核對"
                             />
                         </div>
 

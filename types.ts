@@ -34,9 +34,11 @@ export enum OrderStatus {
 
     // --- Badge/Stall Flow (New) ---
     QUANTITY_SURVEY = '數量調查中',
+    QUANTITY_CONFIRMED = '數量已確認',
     SHARED_PAYMENT = '均攤收款中',
     SAMPLE_PRODUCTION = '樣品製作中',
     BULK_PAYMENT = '大貨收款中',
+    BULK_PRODUCTION = '大貨製作中',
     LEADER_SHIPPING = '團主出貨中',
     CONSOLIDATED_SHIPPING = '集運出貨中',
     SIAM_PACKING = '暹羅打包中',
@@ -64,9 +66,11 @@ export const DollOrderStatusArray = [
 // 地攤訂單流程
 export const BadgeOrderStatusArray = [
     OrderStatus.QUANTITY_SURVEY,
+    OrderStatus.QUANTITY_CONFIRMED,
     OrderStatus.SHARED_PAYMENT,
     OrderStatus.SAMPLE_PRODUCTION,
     OrderStatus.BULK_PAYMENT,
+    OrderStatus.BULK_PRODUCTION,
     OrderStatus.LEADER_SHIPPING,
     OrderStatus.CONSOLIDATED_SHIPPING,
     OrderStatus.WAREHOUSE_ARRIVED, // Optional: Keep warehouse logic if needed, or skip
@@ -97,6 +101,7 @@ export interface DollOrder {
     orderId: string;
     nickname: string;
     contact: string; // 聯絡方式
+    recipientName?: string; // 賣貨便取貨姓名
     title: string;
     headpieceCraft: HeadpieceCraft;
     referenceImageUrls: string[];
@@ -137,6 +142,7 @@ export interface BadgeOrder {
     orderId: string;
     nickname: string;
     contact: string; // 聯絡方式
+    recipientName?: string; // 賣貨便取貨姓名
     productTitle: string; // 完整名稱：[分類] 系列 - 規格
     price: number;
     status: OrderStatus;

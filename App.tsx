@@ -14,6 +14,7 @@ import AdminLoginPage from './pages/AdminLoginPage';
 import AdminWelcomePage from './pages/AdminWelcomePage';
 import AdminDollsDashboardPage from './pages/AdminDollsDashboardPage';
 import AdminBadgesDashboardPage from './pages/AdminBadgesDashboardPage';
+import AdminFinancePage from './pages/AdminFinancePage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function ScrollToTop() {
@@ -95,9 +96,26 @@ function App() {
             <Route path="/admin/login" element={<AdminLoginPage />} />
 
             {/* Protected Admin Routes */}
-            <Route path="/admin" element={<ProtectedRoute><AdminWelcomePage /></ProtectedRoute>} />
-            <Route path="/admin/dolls" element={<ProtectedRoute><AdminDollsDashboardPage /></ProtectedRoute>} />
-            <Route path="/admin/badges" element={<ProtectedRoute><AdminBadgesDashboardPage /></ProtectedRoute>} />
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminWelcomePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/dolls" element={
+              <ProtectedRoute>
+                <AdminDollsDashboardPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/badges" element={
+              <ProtectedRoute>
+                <AdminBadgesDashboardPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/finance" element={
+              <ProtectedRoute>
+                <AdminFinancePage />
+              </ProtectedRoute>
+            } />
           </Routes>
         </main>
         <FooterContent />

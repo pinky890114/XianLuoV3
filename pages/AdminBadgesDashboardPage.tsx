@@ -47,6 +47,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
     const [editingOrderPrice, setEditingOrderPrice] = useState<number | ''>('');
     const [editingOrderRemarks, setEditingOrderRemarks] = useState('');
     const [editingContact, setEditingContact] = useState('');
+    const [editingRecipientName, setEditingRecipientName] = useState('');
     const [newOrderStatus, setNewOrderStatus] = useState<OrderStatus | null>(null);
     const [adminMessageInput, setAdminMessageInput] = useState('');
     const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -59,9 +60,13 @@ const AdminBadgesDashboardPage: React.FC = () => {
     const [newOrderSpecIndex, setNewOrderSpecIndex] = useState<number | null>(null);
     const [newOrderNickname, setNewOrderNickname] = useState('');
     const [newOrderContact, setNewOrderContact] = useState('');
+    const [newOrderRecipientName, setNewOrderRecipientName] = useState('');
     const [newOrderPrice, setNewOrderPrice] = useState<number | ''>('');
     const [newOrderRemarks, setNewOrderRemarks] = useState('');
     const [newOrderStatusManual, setNewOrderStatusManual] = useState<OrderStatus>(OrderStatus.QUANTITY_SURVEY);
+
+    // Procurement List State
+    const [isProcurementModalOpen, setIsProcurementModalOpen] = useState(false);
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -156,6 +161,51 @@ const AdminBadgesDashboardPage: React.FC = () => {
             return matchesKeyword && matchesStatus;
         });
     }, [orders, filterKeyword, filterStatus]);
+
+    // Procurement List Logic
+    const procurementList = useMemo(() => {
+        if (!isProcurementModalOpen) return [];
+        
+        const summary: Record<string, { category: string, series: string, style: string, spec: string, qty: number }> = {};
+
+        filteredOrders.forEach(order => {
+            if (!order.productTitle) return;
+            const lines = order.productTitle.split('\n');
+            lines.forEach(line => {
+                const match = line.match(/^\[(.*?)\] (.*?) - (?:(?:\((.*?)\) )?(.*?)) x(\d+)$/);
+                if (match) {
+                    const [_, category, series, style, spec, qtyStr] = match;
+                    const qty = parseInt(qtyStr, 10);
+                    const key = `${category}_${series}_${style || ''}_${spec}`;
+                    
+                    if (!summary[key]) {
+                        summary[key] = {
+                            category,
+                            series,
+                            style: style || '',
+                            spec,
+                            qty: 0
+                        };
+                    }
+                    summary[key].qty += qty;
+                }
+            });
+        });
+
+        return Object.values(summary).sort((a, b) => {
+            if (a.category !== b.category) return a.category.localeCompare(b.category);
+            if (a.series !== b.series) return a.series.localeCompare(b.series);
+            return a.spec.localeCompare(b.spec);
+        });
+    }, [filteredOrders, isProcurementModalOpen]);
+
+    const copyProcurementList = () => {
+        const text = procurementList.map(item => 
+            `[${item.category}] ${item.series} - ${item.style ? `(${item.style}) ` : ''}${item.spec} x${item.qty}`
+        ).join('\n');
+        navigator.clipboard.writeText(text);
+        setInfoModalState({ title: '成功', message: '已複製到剪貼簿' });
+    };
 
     // --- Product Management Logic ---
 
@@ -326,6 +376,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
         setEditingOrderPrice(order.price);
         setEditingOrderRemarks(order.remarks);
         setEditingContact(order.contact || '');
+        setEditingRecipientName(order.recipientName || '');
         setNewOrderStatus(order.status);
         setAdminMessageInput('');
         setIsOrderEditModalOpen(true);
@@ -340,10 +391,11 @@ const AdminBadgesDashboardPage: React.FC = () => {
             if (editingOrderPrice !== '' && Number(editingOrderPrice) !== selectedOrder.price) updates.price = Number(editingOrderPrice);
             if (editingOrderRemarks !== selectedOrder.remarks) updates.remarks = editingOrderRemarks;
             if (editingContact !== selectedOrder.contact) updates.contact = editingContact;
+            if (editingRecipientName !== selectedOrder.recipientName) updates.recipientName = editingRecipientName;
 
             if (Object.keys(updates).length > 0) {
                  await updateDoc(doc(db, 'badgeOrders', selectedOrder.id), updates);
-                 if (updates.status || updates.price || updates.remarks) {
+                 if (updates.status || updates.price || updates.remarks || updates.recipientName) {
                      await syncOrderToGoogleSheet({ ...selectedOrder, ...updates }, 'badge');
                  }
             }
@@ -384,6 +436,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
         setNewOrderSpecIndex(null);
         setNewOrderNickname('');
         setNewOrderContact('');
+        setNewOrderRecipientName('');
         setNewOrderPrice('');
         setNewOrderRemarks('');
         setNewOrderStatusManual(OrderStatus.QUANTITY_SURVEY); // Default to first step
@@ -396,8 +449,8 @@ const AdminBadgesDashboardPage: React.FC = () => {
     };
 
     const handleCreateOrder = async () => {
-        if (!newOrderNickname || !newOrderContact || newOrderPrice === '' || !newOrderSeriesId || newOrderSpecIndex === null) {
-            setInfoModalState({ title: '提示', message: '請完整填寫：暱稱、聯絡方式、商品規格與價格' });
+        if (!newOrderNickname || !newOrderContact || !newOrderRecipientName || newOrderPrice === '' || !newOrderSeriesId || newOrderSpecIndex === null) {
+            setInfoModalState({ title: '提示', message: '請完整填寫：暱稱、聯絡方式、取貨姓名、商品規格與價格' });
             return;
         }
 
@@ -417,6 +470,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
                 orderId,
                 nickname: newOrderNickname,
                 contact: newOrderContact,
+                recipientName: newOrderRecipientName,
                 productTitle,
                 price: Number(newOrderPrice),
                 status: newOrderStatusManual, 
@@ -433,6 +487,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
             
             setNewOrderNickname('');
             setNewOrderContact('');
+            setNewOrderRecipientName('');
             setNewOrderRemarks('');
             setNewOrderSpecIndex(null);
             setNewOrderSeriesId('');
@@ -482,6 +537,15 @@ const AdminBadgesDashboardPage: React.FC = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         新增訂單
                     </button>
+                    {activeTab === 'orders' && (
+                        <button 
+                            onClick={() => setIsProcurementModalOpen(true)}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md font-bold shadow hover:bg-green-700 transition-all flex items-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14h6"></path><path d="M9 10h6"></path><path d="M9 18h6"></path></svg>
+                            一鍵採購清單
+                        </button>
+                    )}
                     <div className="bg-white p-1 rounded-lg shadow-sm border flex">
                         <button onClick={() => setActiveTab('products')} className={`px-6 py-2 rounded-md font-bold transition-all ${activeTab === 'products' ? 'bg-siam-blue text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>商品管理</button>
                         <button onClick={() => setActiveTab('orders')} className={`px-6 py-2 rounded-md font-bold transition-all ${activeTab === 'orders' ? 'bg-siam-blue text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>訂單管理</button>
@@ -667,6 +731,7 @@ const AdminBadgesDashboardPage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                         <input type="text" value={newOrderNickname} onChange={e => setNewOrderNickname(e.target.value)} className="w-full p-2 border rounded" placeholder="暱稱" />
                         <input type="text" value={newOrderContact} onChange={e => setNewOrderContact(e.target.value)} className="w-full p-2 border rounded" placeholder="聯絡方式" />
+                        <input type="text" value={newOrderRecipientName} onChange={e => setNewOrderRecipientName(e.target.value)} className="w-full p-2 border rounded" placeholder="取貨姓名" />
                         <input type="number" value={newOrderPrice} onChange={e => setNewOrderPrice(e.target.value ? Number(e.target.value) : '')} className="w-full p-2 border rounded" placeholder="價格" />
                         <select value={newOrderStatusManual} onChange={e => setNewOrderStatusManual(e.target.value as OrderStatus)} className="w-full p-2 border rounded bg-white">
                              {/* Only Badge Statuses */}
@@ -677,6 +742,67 @@ const AdminBadgesDashboardPage: React.FC = () => {
                     <div className="flex justify-end gap-3 pt-4 border-t">
                         <button onClick={() => setIsNewOrderModalOpen(false)} className="px-4 py-2 bg-gray-100 rounded">取消</button>
                         <button onClick={handleCreateOrder} disabled={isUpdating} className="px-6 py-2 bg-siam-blue text-white rounded font-bold">{isUpdating ? <LoadingSpinner /> : '確認補單'}</button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Procurement List Modal */}
+            <Modal isOpen={isProcurementModalOpen} onClose={() => setIsProcurementModalOpen(false)} title="一鍵採購清單" maxWidth="max-w-4xl">
+                <div className="space-y-4">
+                    <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-800 border border-blue-200">
+                        <p className="font-bold">統計說明：</p>
+                        <p>此清單基於目前篩選條件下的訂單進行統計。若需統計特定狀態（如「數量調查中」），請先在訂單列表進行篩選。</p>
+                        <p className="mt-1">目前篩選條件：{filterStatus || '全部狀態'} / 關鍵字：{filterKeyword || '無'}</p>
+                    </div>
+
+                    <div className="overflow-x-auto max-h-[60vh] border rounded-lg">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">分類</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">系列</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">規格</th>
+                                    <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">總數量</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {procurementList.length > 0 ? (
+                                    procurementList.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="px-4 py-2 text-sm text-gray-900">{item.category}</td>
+                                            <td className="px-4 py-2 text-sm text-gray-900 font-bold">{item.series}</td>
+                                            <td className="px-4 py-2 text-sm text-gray-900">
+                                                {item.style && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs mr-2">{item.style}</span>}
+                                                {item.spec}
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-siam-blue font-bold text-right">{item.qty}</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                                            沒有可統計的資料
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                            <tfoot className="bg-gray-50 font-bold">
+                                <tr>
+                                    <td colSpan={3} className="px-4 py-3 text-right">總計件數</td>
+                                    <td className="px-4 py-3 text-right text-siam-blue">
+                                        {procurementList.reduce((acc, item) => acc + item.qty, 0)}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                        <button onClick={() => setIsProcurementModalOpen(false)} className="px-4 py-2 bg-gray-100 rounded">關閉</button>
+                        <button onClick={copyProcurementList} className="px-6 py-2 bg-siam-blue text-white rounded font-bold flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            複製清單文字
+                        </button>
                     </div>
                 </div>
             </Modal>
@@ -786,6 +912,10 @@ const AdminBadgesDashboardPage: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">聯絡方式</label>
                                 <input type="text" value={editingContact} onChange={(e) => setEditingContact(e.target.value)} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">取貨姓名</label>
+                                <input type="text" value={editingRecipientName} onChange={(e) => setEditingRecipientName(e.target.value)} className="w-full p-2 border rounded" />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">備註</label>

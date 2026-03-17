@@ -24,17 +24,24 @@ interface SpecCardProps {
     qty: number;
     onUpdate: (productId: string, idx: number, delta: number) => void;
     onInputChange: (productId: string, idx: number, value: string) => void;
+    onImageClick: (url: string) => void;
 }
 
-const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate, onInputChange }) => {
+const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate, onInputChange, onImageClick }) => {
     const status = getSpecStatus(spec);
     const isPreview = status === 'preview';
 
     return (
         <div className={`flex items-center justify-between p-3 rounded-lg border transition-all ${qty > 0 ? 'bg-siam-cream border-siam-brown ring-1 ring-siam-brown/20' : 'bg-white border-gray-200'}`}>
             <div className="flex items-center flex-1 relative overflow-hidden">
-                <div className="relative w-14 h-14 mr-3 flex-shrink-0">
-                    <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-full h-full rounded object-cover" />
+                <div 
+                    className="relative w-14 h-14 mr-3 flex-shrink-0 cursor-zoom-in group/img"
+                    onClick={() => spec.imageUrl && onImageClick(spec.imageUrl)}
+                >
+                    <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-full h-full rounded object-cover transition-transform group-hover/img:scale-105" />
+                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors rounded flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-0 group-hover/img:opacity-100 transition-opacity drop-shadow-md"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                    </div>
                     {isPreview && (
                         <div className="absolute inset-0 bg-black/60 rounded flex items-center justify-center z-10 backdrop-blur-[1px]">
                             <span className="text-[10px] text-white font-bold border border-white/80 px-1 py-0.5 rounded leading-none whitespace-nowrap transform -rotate-12">COMING SOON</span>
@@ -96,6 +103,7 @@ const SiamStallPage: React.FC = () => {
     const [remarks, setRemarks] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submittedOrderId, setSubmittedOrderId] = useState('');
+    const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -249,6 +257,7 @@ const SiamStallPage: React.FC = () => {
         setRemarks('');
         setViewSeriesId('');
         setViewCat('');
+        setZoomedImage(null);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -325,6 +334,13 @@ const SiamStallPage: React.FC = () => {
                 }
                 .animate-slideUp {
                     animation: fadeIn 0.5s ease-out forwards;
+                }
+                @keyframes scaleIn {
+                    from { opacity: 0; transform: scale(0.9); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                .animate-scaleIn {
+                    animation: scaleIn 0.3s ease-out forwards;
                 }
             `}</style>
             <Link to="/" className="text-siam-blue hover:text-siam-dark transition-colors mb-4 inline-flex items-center space-x-2">
@@ -437,6 +453,7 @@ const SiamStallPage: React.FC = () => {
                                                                 qty={getQuantity(viewingSeries.id, item.originalIndex)}
                                                                 onUpdate={updateCart}
                                                                 onInputChange={handleInputChange}
+                                                                onImageClick={setZoomedImage}
                                                             />
                                                         ))}
                                                     </div>
@@ -456,6 +473,7 @@ const SiamStallPage: React.FC = () => {
                                                                 qty={getQuantity(viewingSeries.id, item.originalIndex)}
                                                                 onUpdate={updateCart}
                                                                 onInputChange={handleInputChange}
+                                                                onImageClick={setZoomedImage}
                                                             />
                                                         ))}
                                                     </div>
@@ -474,6 +492,7 @@ const SiamStallPage: React.FC = () => {
                                                     qty={getQuantity(viewingSeries.id, item.originalIndex)}
                                                     onUpdate={updateCart}
                                                     onInputChange={handleInputChange}
+                                                    onImageClick={setZoomedImage}
                                                 />
                                             ))}
                                         </div>
@@ -622,6 +641,27 @@ const SiamStallPage: React.FC = () => {
                         <Link to="/order-status" className="bg-siam-blue text-siam-cream py-3 px-8 rounded-lg font-bold shadow-md">查詢進度</Link>
                         <button onClick={resetSelection} className="bg-white text-siam-dark border border-siam-dark/20 py-3 px-8 rounded-lg font-bold">返回地攤</button>
                     </div>
+                </div>
+            )}
+
+            {/* Lightbox Modal */}
+            {zoomedImage && (
+                <div 
+                    className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 md:p-10 animate-fadeIn cursor-zoom-out"
+                    onClick={() => setZoomedImage(null)}
+                >
+                    <button 
+                        className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors p-2 z-[110]"
+                        onClick={(e) => { e.stopPropagation(); setZoomedImage(null); }}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                    <img 
+                        src={zoomedImage} 
+                        alt="Zoomed" 
+                        className="max-w-full max-h-full object-contain rounded shadow-2xl animate-scaleIn"
+                        onClick={(e) => e.stopPropagation()}
+                    />
                 </div>
             )}
         </div>

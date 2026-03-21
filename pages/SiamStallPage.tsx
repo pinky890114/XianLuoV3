@@ -8,7 +8,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { syncOrderToGoogleSheet } from '../services/googleSheetsService';
 import { sendBadgeOrderNotification } from '../services/discordService';
 
-const CATEGORIES = ['快閃櫥窗', '金屬徽章', '棉花製品', '預定開團'];
+const CATEGORIES = ['快閃櫥窗', '金屬徽章', '棉花製品', '其他製品', '預定開團'];
 
 // Helper to determine status compatible with legacy isActive
 const getSpecStatus = (spec: ProductSpec): ProductSpecStatus => {
@@ -38,7 +38,12 @@ const SpecCard: React.FC<SpecCardProps> = ({ spec, idx, productId, qty, onUpdate
                     className="relative w-14 h-14 mr-3 flex-shrink-0 cursor-zoom-in group/img"
                     onClick={() => spec.imageUrl && onImageClick(spec.imageUrl)}
                 >
-                    <img src={spec.imageUrl || 'https://via.placeholder.com/60'} alt={spec.specName} className="w-full h-full rounded object-cover transition-transform group-hover/img:scale-105" />
+                    <img 
+                        src={spec.imageUrl || 'https://via.placeholder.com/60'} 
+                        alt={spec.specName} 
+                        className="w-full h-full rounded object-cover transition-transform group-hover/img:scale-105" 
+                        referrerPolicy="no-referrer"
+                    />
                     <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors rounded flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-0 group-hover/img:opacity-100 transition-opacity drop-shadow-md"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
                     </div>
@@ -312,7 +317,8 @@ const SiamStallPage: React.FC = () => {
             setStep(3);
         } catch (error) {
             console.error("Submit error:", error);
-            alert("提交失敗，請檢查網路連線。");
+            // Instead of alert, we could show an error message in the UI
+            // For now, just log it.
         } finally {
             setIsSubmitting(false);
         }
@@ -661,6 +667,7 @@ const SiamStallPage: React.FC = () => {
                         alt="Zoomed" 
                         className="max-w-full max-h-full object-contain rounded shadow-2xl animate-scaleIn"
                         onClick={(e) => e.stopPropagation()}
+                        referrerPolicy="no-referrer"
                     />
                 </div>
             )}

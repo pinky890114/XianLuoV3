@@ -554,7 +554,12 @@ const AdminDollsDashboardPage: React.FC = () => {
                                     {selectedOrder.referenceImageUrls.map((url, idx) => (
                                         <div key={idx} className="relative group">
                                             <a href={url} target="_blank" rel="noopener noreferrer" className="block aspect-square relative overflow-hidden rounded-lg border border-gray-300 shadow-sm bg-white">
-                                                <img src={url} alt={`參考圖 ${idx + 1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                                <img 
+                                                    src={url} 
+                                                    alt={`參考圖 ${idx + 1}`} 
+                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                                                    referrerPolicy="no-referrer"
+                                                />
                                             </a>
                                             <a 
                                                 href={url} 
@@ -627,7 +632,13 @@ const AdminDollsDashboardPage: React.FC = () => {
                             {selectedOrder.progressImageUrls && selectedOrder.progressImageUrls.length > 0 && (
                                 <div className="grid grid-cols-3 gap-2 mt-2">
                                     {selectedOrder.progressImageUrls.map((url, idx) => (
-                                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer"><img src={url} className="w-full h-16 object-cover rounded border" /></a>
+                                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
+                                            <img 
+                                                src={url} 
+                                                className="w-full h-16 object-cover rounded border" 
+                                                referrerPolicy="no-referrer"
+                                            />
+                                        </a>
                                     ))}
                                 </div>
                             )}

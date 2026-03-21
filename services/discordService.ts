@@ -54,7 +54,7 @@ export const sendDollOrderNotification = async (order: Omit<DollOrder, 'id' | 'o
             { name: '📝 備註', value: order.remarks || '無', inline: false },
         ],
         footer: {
-            text: '暹羅的賠錢生意 - 自動通知系統',
+            text: '暹羅下單系統 - 自動通知系統',
         },
         timestamp: new Date().toISOString(),
     };
@@ -78,7 +78,7 @@ export const sendBadgeOrderNotification = async (order: Omit<BadgeOrder, 'id' | 
             { name: '📝 備註', value: order.remarks || '無', inline: false },
         ],
         footer: {
-            text: '暹羅的賠錢生意 - 自動通知系統',
+            text: '暹羅下單系統 - 自動通知系統',
         },
         timestamp: new Date().toISOString(),
     };

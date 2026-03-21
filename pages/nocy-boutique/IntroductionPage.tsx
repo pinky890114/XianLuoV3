@@ -11,8 +11,18 @@ const IntroductionPage: React.FC = () => {
       </p>
       
       <div className="grid md:grid-cols-2 gap-6 my-6">
-        <img src="https://i.ibb.co/Ld39cKQ7/att-5rw-Tm-NTEvgib2-RVz-HE-FV0-HH1-Mm9b-On-P0-Ri-EVe-K54b-M.jpg" alt="小餅介紹圖 1" className="rounded-lg shadow-md w-full h-auto object-cover" />
-        <img src="https://i.ibb.co/v47RXBf8/att-Bm-Yv-RFTDw4673g-O-g4p-Iu-BWVw9og-N8-WWuf5-OGfl-Z0go.jpg" alt="小餅介紹圖 2" className="rounded-lg shadow-md w-full h-auto object-cover" />
+        <img 
+          src="https://i.ibb.co/Ld39cKQ7/att-5rw-Tm-NTEvgib2-RVz-HE-FV0-HH1-Mm9b-On-P0-Ri-EVe-K54b-M.jpg" 
+          alt="小餅介紹圖 1" 
+          className="rounded-lg shadow-md w-full h-auto object-cover" 
+          referrerPolicy="no-referrer"
+        />
+        <img 
+          src="https://i.ibb.co/v47RXBf8/att-Bm-Yv-RFTDw4673g-O-g4p-Iu-BWVw9og-N8-WWuf5-OGfl-Z0go.jpg" 
+          alt="小餅介紹圖 2" 
+          className="rounded-lg shadow-md w-full h-auto object-cover" 
+          referrerPolicy="no-referrer"
+        />
       </div>
 
       <h3 className="text-2xl font-bold text-siam-dark">不論是自家OC、影視人物、動畫角色、喜歡的Vtuber，只要有清晰圖片老師都可以努力一下</h3>

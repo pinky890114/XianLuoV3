@@ -102,7 +102,7 @@ const OrderStatusPage: React.FC = () => {
             setNewMessage('');
         } catch (error) {
             console.error("Error sending message:", error);
-            alert("訊息發送失敗");
+            // Instead of alert, we could show an error message in the UI
         } finally {
             setSendingMsgId(null);
         }
@@ -276,7 +276,13 @@ const OrderStatusPage: React.FC = () => {
                                         {order.progressImageUrls.length > 0 ? (
                                             <div className="grid grid-cols-2 gap-3">
                                                 {order.progressImageUrls.map((url, idx) => (
-                                                    <img key={idx} src={url} alt={`Progress ${idx}`} className="rounded-lg shadow-sm hover:shadow-md transition-shadow w-full h-40 object-cover cursor-pointer hover:scale-[1.02] transform duration-200"/>
+                                                    <img 
+                                                        key={idx} 
+                                                        src={url} 
+                                                        alt={`Progress ${idx}`} 
+                                                        className="rounded-lg shadow-sm hover:shadow-md transition-shadow w-full h-40 object-cover cursor-pointer hover:scale-[1.02] transform duration-200"
+                                                        referrerPolicy="no-referrer"
+                                                    />
                                                 ))}
                                             </div>
                                         ) : (

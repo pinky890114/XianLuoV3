@@ -154,7 +154,7 @@ const AdoptionWizardPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!nickname || !contact || !recipientName || !title || !referenceImages || referenceImages.length === 0) {
-            alert('請填寫完整資料（含暱稱、聯絡方式、取貨姓名、委託內容）並上傳參考圖');
+            console.error('Missing required fields');
             return;
         }
 
@@ -212,7 +212,7 @@ const AdoptionWizardPage: React.FC = () => {
             setStep(4);
         } catch (error) {
             console.error("Submit error:", error);
-            alert("提交失敗，請檢查網路連線後重試。");
+            // Instead of alert, we could show an error message in the UI
         } finally {
             setIsSubmitting(false);
         }
@@ -369,17 +369,32 @@ const AdoptionWizardPage: React.FC = () => {
 
                     <div className="p-3 bg-white rounded border border-gray-100">
                         <h4 className="font-bold text-siam-dark mb-2 text-lg">跟頭髮一體</h4>
-                        <img src="https://i.ibb.co/d0HJH4Mc/image.png" alt="跟頭髮一體範例" className="w-full h-auto rounded mb-2 object-cover border border-gray-200" />
+                    <img 
+                        src="https://i.ibb.co/d0HJH4Mc/image.png" 
+                        alt="跟頭髮一體範例" 
+                        className="w-full h-auto rounded mb-2 object-cover border border-gray-200" 
+                        referrerPolicy="no-referrer"
+                    />
                         <p className="text-sm leading-relaxed">與頭髮一體、無法拆卸，優點是牢固不擔心遺失，缺點是無法自由進行搭配。適合太小或者角色的固定配件。</p>
                     </div>
                     <div className="p-3 bg-white rounded border border-gray-100">
                         <h4 className="font-bold text-siam-dark mb-2 text-lg">可拆插入式</h4>
-                        <img src="https://i.ibb.co/qHQDQWS/image.png" alt="可拆插入式範例" className="w-full h-auto rounded mb-2 object-cover border border-gray-200" />
+                    <img 
+                        src="https://i.ibb.co/qHQDQWS/image.png" 
+                        alt="可拆插入式範例" 
+                        className="w-full h-auto rounded mb-2 object-cover border border-gray-200" 
+                        referrerPolicy="no-referrer"
+                    />
                         <p className="text-sm leading-relaxed">針對該髮型做設計、貼合效果最好，缺點是只能適用於同一款髮型。適合角色特定造型的搭配。</p>
                     </div>
                     <div className="p-3 bg-white rounded border border-gray-100">
                         <h4 className="font-bold text-siam-dark mb-2 text-lg">通用夾式</h4>
-                        <img src="https://i.ibb.co/gZkdgFLh/image.png" alt="通用夾式範例" className="w-full h-auto rounded mb-2 object-cover border border-gray-200" />
+                    <img 
+                        src="https://i.ibb.co/gZkdgFLh/image.png" 
+                        alt="通用夾式範例" 
+                        className="w-full h-auto rounded mb-2 object-cover border border-gray-200" 
+                        referrerPolicy="no-referrer"
+                    />
                         <p className="text-sm leading-relaxed">可以自由搭配大多數髮型使用，缺點是效果相對前兩種而言較差。適合有多款造型的角色使用。</p>
                     </div>
                 </div>

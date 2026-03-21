@@ -13,7 +13,12 @@ const StickerPage: React.FC = () => {
             <article className="prose max-w-none text-siam-brown font-sans prose-headings:font-sans prose-headings:text-siam-dark prose-strong:font-sans prose-strong:font-bold prose-strong:text-siam-dark">
                 <h2>保護膜標籤紙</h2>
                 <p className="text-lg font-bold">4元/張</p>
-                <img src="https://i.ibb.co/RpKQZZ6Y/image.png" alt="保護膜標籤紙" className="rounded-lg shadow-md mx-auto" />
+                <img 
+                    src="https://i.ibb.co/RpKQZZ6Y/image.png" 
+                    alt="保護膜標籤紙" 
+                    className="rounded-lg shadow-md mx-auto" 
+                    referrerPolicy="no-referrer"
+                />
                 <h3>說明：</h3>
                 <ul>
                     <li>每張有20個標籤貼紙，每一個尺寸是1.4×2.6cm</li>

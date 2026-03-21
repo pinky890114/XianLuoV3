@@ -35,7 +35,7 @@ const HomePage: React.FC = () => {
       
       <header className="mb-16 animate-fadeIn">
         <h1 className="text-4xl md:text-5xl font-bold text-siam-dark tracking-wider mb-4">
-          暹羅的賠錢生意
+          暹羅下單系統
         </h1>
         <div className="w-16 h-1 bg-siam-brown/30 mx-auto rounded-full"></div>
         <p className="mt-6 text-xl text-siam-brown font-medium opacity-70 italic tracking-tight">

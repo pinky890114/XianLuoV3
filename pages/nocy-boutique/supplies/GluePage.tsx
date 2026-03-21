@@ -13,7 +13,12 @@ const GluePage: React.FC = () => {
             <article className="prose max-w-none text-siam-brown font-sans prose-headings:font-sans prose-headings:text-siam-dark prose-strong:font-sans prose-strong:font-bold prose-strong:text-siam-dark">
                 <h2>保麗龍膠</h2>
                 <p className="text-lg font-bold">13元/瓶</p>
-                <img src="https://i.ibb.co/gbZVxm4h/image.png" alt="保麗龍膠" className="rounded-lg shadow-md mx-auto" />
+                <img 
+                    src="https://i.ibb.co/gbZVxm4h/image.png" 
+                    alt="保麗龍膠" 
+                    className="rounded-lg shadow-md mx-auto" 
+                    referrerPolicy="no-referrer"
+                />
                 <h3>說明：</h3>
                 <ul>
                     <li>一瓶是30ml，這是我目前能找到最小容量的包裝</li>

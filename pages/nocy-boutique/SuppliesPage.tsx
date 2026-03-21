@@ -71,7 +71,12 @@ const SuppliesPage: React.FC = () => {
               tabIndex={0}
               onKeyPress={(e) => { if (e.key === 'Enter') setSelectedSupply(item); }}
             >
-              <img src={item.imageUrl} alt={item.name} className="w-full h-48 object-cover" />
+              <img 
+                src={item.imageUrl} 
+                alt={item.name} 
+                className="w-full h-48 object-cover" 
+                referrerPolicy="no-referrer"
+              />
               <div className="p-4">
                 <h3 className="text-xl font-bold text-siam-dark group-hover:text-siam-blue transition-colors">{item.name}</h3>
                 <p className="text-siam-brown">{item.price}</p>
@@ -84,7 +89,12 @@ const SuppliesPage: React.FC = () => {
       {selectedSupply && (
         <Modal isOpen={!!selectedSupply} onClose={() => setSelectedSupply(null)} title={selectedSupply.name}>
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
-                <img src={selectedSupply.imageUrl} alt={selectedSupply.name} className="rounded-lg shadow-md mx-auto" />
+                <img 
+                    src={selectedSupply.imageUrl} 
+                    alt={selectedSupply.name} 
+                    className="rounded-lg shadow-md mx-auto" 
+                    referrerPolicy="no-referrer"
+                />
                 <p className="text-lg font-bold text-siam-dark">{selectedSupply.price}</p>
                  <article className="prose max-w-none text-siam-brown font-sans prose-headings:font-sans prose-headings:text-siam-dark prose-strong:font-sans prose-strong:font-bold prose-strong:text-siam-dark">
                     <h3>說明：</h3>

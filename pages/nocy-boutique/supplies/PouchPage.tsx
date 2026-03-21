@@ -13,7 +13,12 @@ const PouchPage: React.FC = () => {
             <article className="prose max-w-none text-siam-brown font-sans prose-headings:font-sans prose-headings:text-siam-dark prose-strong:font-sans prose-strong:font-bold prose-strong:text-siam-dark">
                 <h2>A5活頁收納袋</h2>
                 <p className="text-lg font-bold">8元/張</p>
-                <img src="https://i.ibb.co/BVkD3BHT/image.png" alt="A5活頁收納袋" className="rounded-lg shadow-md mx-auto" />
+                <img 
+                    src="https://i.ibb.co/BVkD3BHT/image.png" 
+                    alt="A5活頁收納袋" 
+                    className="rounded-lg shadow-md mx-auto" 
+                    referrerPolicy="no-referrer"
+                />
                 <h3>說明：</h3>
                 <ul>
                     <li>有分成一頁單格或雙格的款式。尺寸及放置後的樣式可參考附圖</li>

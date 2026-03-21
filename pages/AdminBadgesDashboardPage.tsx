@@ -10,7 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Modal from '../components/Modal';
 import { syncOrderToGoogleSheet } from '../services/googleSheetsService';
 
-const CATEGORIES = ['快閃櫥窗', '金屬徽章', '棉花製品'];
+const CATEGORIES = ['快閃櫥窗', '金屬徽章', '棉花製品', '其他製品'];
 
 const AdminBadgesDashboardPage: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
@@ -843,7 +843,15 @@ const AdminBadgesDashboardPage: React.FC = () => {
                                 {editingProduct.specs.map((spec, idx) => (
                                     <div key={idx} className="p-4 border rounded-lg bg-gray-50 flex gap-4">
                                         <div className="w-24 h-24 bg-white border rounded overflow-hidden flex-shrink-0 relative group">
-                                            {spec.imageUrl ? <img src={spec.imageUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300">無圖</div>}
+                                            {spec.imageUrl ? (
+                                                <img 
+                                                    src={spec.imageUrl} 
+                                                    className="w-full h-full object-cover" 
+                                                    referrerPolicy="no-referrer"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-300">無圖</div>
+                                            )}
                                             <label className="absolute inset-0 bg-black/50 text-white flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 cursor-pointer transition-all">更換圖片<input type="file" hidden accept="image/*" onChange={e => e.target.files && handleImageChange(idx, e.target.files[0])} /></label>
                                         </div>
                                         <div className="flex-grow grid grid-cols-3 gap-2">

@@ -13,7 +13,12 @@ const StandBagPage: React.FC = () => {
             <article className="prose max-w-none text-siam-brown font-sans prose-headings:font-sans prose-headings:text-siam-dark prose-strong:font-sans prose-strong:font-bold prose-strong:text-siam-dark">
                 <h2>基礎款立牌包</h2>
                 <p className="text-lg font-bold">75元/個</p>
-                <img src="https://i.ibb.co/HpHPGzRT/IMG-4596.jpg" alt="基礎款立牌包" className="rounded-lg shadow-md mx-auto" />
+                <img 
+                    src="https://i.ibb.co/HpHPGzRT/IMG-4596.jpg" 
+                    alt="基礎款立牌包" 
+                    className="rounded-lg shadow-md mx-auto" 
+                    referrerPolicy="no-referrer"
+                />
                 <h3>說明：</h3>
                 <ul>
                     <li>大創賣的普通立牌包，每一個尺寸是11×2.5×16cm，適配大多數小餅的長寬（有帽子的不一定可以）</li>
